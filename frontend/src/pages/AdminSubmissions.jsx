@@ -328,7 +328,12 @@ export default function AdminSubmissions() {
                     Uploaded Proof Screenshot:
                   </div>
                   <a
-                    href={`/uploads/screenshots/${selectedSub.screenshot_path}`}
+                    href={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="btn btn-secondary btn-sm"
@@ -352,7 +357,12 @@ export default function AdminSubmissions() {
                   }}
                 >
                   <img
-                    src={`/uploads/screenshots/${selectedSub.screenshot_path}`}
+                    src={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
                     alt="Registration Proof"
                     style={{ maxWidth: '100%', maxHeight: '360px', objectFit: 'contain' }}
                   />

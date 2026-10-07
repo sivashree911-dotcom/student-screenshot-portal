@@ -104,7 +104,13 @@ export default function AdminHackathons() {
       isActive: Boolean(h.is_active)
     });
     setPosterFile(null);
-    setPosterPreview(h.poster_path ? `/uploads/posters/${h.poster_path}` : null);
+    setPosterPreview(
+      h.poster_path
+        ? h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
+          ? h.poster_path
+          : `/uploads/posters/${h.poster_path}`
+        : null
+    );
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -234,7 +240,11 @@ export default function AdminHackathons() {
               >
                 {h.poster_path ? (
                   <img
-                    src={`/uploads/posters/${h.poster_path}`}
+                    src={
+                      h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
+                        ? h.poster_path
+                        : `/uploads/posters/${h.poster_path}`
+                    }
                     alt={h.name}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />

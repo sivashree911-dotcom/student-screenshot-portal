@@ -88,7 +88,9 @@ export default function HackathonDashboard() {
             >
               {hackathons.map((h) => {
                 const posterUrl = h.poster_path
-                  ? `/uploads/posters/${h.poster_path}`
+                  ? h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
+                    ? h.poster_path
+                    : `/uploads/posters/${h.poster_path}`
                   : null;
 
                 return (

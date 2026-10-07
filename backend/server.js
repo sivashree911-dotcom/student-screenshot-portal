@@ -58,17 +58,23 @@ app.use(errorHandler);
 const PORT = config.port;
 
 async function startServer() {
-  // Initialize MySQL tables and default seed data
-  await initDatabase();
+  try {
+    // Initialize MySQL tables and default seed data
+    await initDatabase();
 
-  app.listen(PORT, () => {
-    console.log(`=======================================================`);
-    console.log(`🚀 Student Screenshot Portal Backend Running`);
-    console.log(`📡 URL: http://localhost:${PORT}`);
-    console.log(`📁 Uploads Directory: ${uploadsPath}`);
-    console.log(`🔒 Environment: ${config.nodeEnv}`);
-    console.log(`=======================================================`);
-  });
+    app.listen(PORT, () => {
+      console.log(`=======================================================`);
+      console.log(`🚀 Student Screenshot Portal Backend Running`);
+      console.log(`📡 URL: http://localhost:${PORT}`);
+      console.log(`📁 Uploads Directory: ${uploadsPath}`);
+      console.log(`🔒 Environment: ${config.nodeEnv}`);
+      console.log(`=======================================================`);
+    });
+  } catch (error) {
+    console.error('❌ [SERVER] Fatal startup error:', error.message);
+    process.exit(1);
+  }
 }
 
 startServer();
+

@@ -15,7 +15,8 @@ import {
   ArrowRight,
   AlertCircle,
   Loader2,
-  Layers
+  Layers,
+  ExternalLink
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -374,10 +375,32 @@ export default function AdminDashboard() {
             {/* Screenshot */}
             {selectedSub.screenshot_path && (
               <div style={{ marginBottom: '1.5rem' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>Proof Screenshot:</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Proof Screenshot:</div>
+                  <a
+                    href={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    <ExternalLink size={12} />
+                    <span>Open Fullscreen</span>
+                  </a>
+                </div>
                 <div style={{ background: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <img
-                    src={`/uploads/screenshots/${selectedSub.screenshot_path}`}
+                    src={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
                     alt="Proof"
                     style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
                   />

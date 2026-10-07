@@ -253,9 +253,26 @@ export default function MySubmissions() {
             {/* Proof Screenshot */}
             {selectedSub.screenshot_path && (
               <div>
-                <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.65rem' }}>
-                  Submitted Screenshot Proof
-                </h4>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+                    Submitted Screenshot Proof
+                  </h4>
+                  <a
+                    href={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-secondary btn-sm"
+                    style={{ fontSize: '0.78rem', padding: '0.2rem 0.5rem' }}
+                  >
+                    <ExternalLink size={12} />
+                    <span>Open Fullscreen</span>
+                  </a>
+                </div>
                 <div
                   style={{
                     background: '#000',
@@ -269,7 +286,12 @@ export default function MySubmissions() {
                   }}
                 >
                   <img
-                    src={`/uploads/screenshots/${selectedSub.screenshot_path}`}
+                    src={
+                      selectedSub.screenshot_path.startsWith('http://') ||
+                      selectedSub.screenshot_path.startsWith('https://')
+                        ? selectedSub.screenshot_path
+                        : `/uploads/screenshots/${selectedSub.screenshot_path}`
+                    }
                     alt="Registration Proof"
                     style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain' }}
                   />
