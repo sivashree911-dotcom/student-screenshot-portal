@@ -9,20 +9,35 @@ const { postersDir } = require('../middleware/uploadMiddleware');
  */
 async function getActiveHackathons(req, res, next) {
   try {
-    const hackathons = await query(
-      `SELECT id, name, institution, description, start_date, end_date, registration_deadline,
-              mode, location, min_team_size, max_team_size, allow_external_participants,
-              registration_url, poster_path, is_active, created_at
-       FROM hackathons
-       WHERE is_active = 1
-       ORDER BY registration_deadline ASC, start_date ASC`
-    );
+    const hackathons = await query(`
+      SELECT
+        id,
+        name,
+        institution,
+        description,
+        start_date,
+        end_date,
+        registration_deadline,
+        mode,
+        location,
+        min_team_size,
+        max_team_size,
+        allow_external_participants,
+        registration_url,
+        poster_path,
+        is_active,
+        created_at
+      FROM hackathons
+      WHERE is_active = 1
+      ORDER BY registration_deadline ASC, start_date ASC
+    `);
 
     res.json({
       success: true,
       count: hackathons.length,
       hackathons
     });
+
   } catch (error) {
     next(error);
   }
@@ -35,14 +50,28 @@ async function getActiveHackathons(req, res, next) {
 async function getHackathonById(req, res, next) {
   try {
     const { id } = req.params;
-    const hackathons = await query(
-      `SELECT id, name, institution, description, start_date, end_date, registration_deadline,
-              mode, location, min_team_size, max_team_size, allow_external_participants,
-              registration_url, poster_path, is_active, created_at
-       FROM hackathons
-       WHERE id = ?`,
-      [id]
-    );
+
+    const hackathons = await query(`
+      SELECT
+        id,
+        name,
+        institution,
+        description,
+        start_date,
+        end_date,
+        registration_deadline,
+        mode,
+        location,
+        min_team_size,
+        max_team_size,
+        allow_external_participants,
+        registration_url,
+        poster_path,
+        is_active,
+        created_at
+      FROM hackathons
+      WHERE id = ?
+    `, [id]);
 
     if (hackathons.length === 0) {
       return res.status(404).json({
@@ -55,6 +84,7 @@ async function getHackathonById(req, res, next) {
       success: true,
       hackathon: hackathons[0]
     });
+
   } catch (error) {
     next(error);
   }
@@ -66,23 +96,85 @@ async function getHackathonById(req, res, next) {
  */
 async function getAllHackathonsAdmin(req, res, next) {
   try {
-    const hackathons = await query(
-      `SELECT h.*, 
-              COUNT(DISTINCT s.id) AS total_submissions,
-              COUNT(DISTINCT CASE WHEN s.status = 'Verified' THEN s.id END) AS verified_submissions,
-              COUNT(DISTINCT CASE WHEN s.status = 'Pending' THEN s.id END) AS pending_submissions,
-              COUNT(DISTINCT CASE WHEN s.status = 'Rejected' THEN s.id END) AS rejected_submissions
-       FROM hackathons h
-       LEFT JOIN submissions s ON h.id = s.hackathon_id
-       GROUP BY h.id
-       ORDER BY h.created_at DESC`
-    );
+    /*
+     * IMPORTANT:
+     * Do not use SELECT h.* with GROUP BY h.id under MySQL
+     * ONLY_FULL_GROUP_BY.
+     *
+     * Explicitly select every hackathon column that is needed
+     * and include those columns in GROUP BY.
+     */
+    const hackathons = await query(`
+      SELECT
+        h.id,
+        h.name,
+        h.institution,
+        h.description,
+        h.start_date,
+        h.end_date,
+        h.registration_deadline,
+        h.mode,
+        h.location,
+        h.min_team_size,
+        h.max_team_size,
+        h.allow_external_participants,
+        h.registration_url,
+        h.poster_path,
+        h.is_active,
+        h.created_at,
+
+        COUNT(DISTINCT s.id) AS total_submissions,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN s.status = 'Verified' THEN s.id
+          END
+        ) AS verified_submissions,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN s.status = 'Pending' THEN s.id
+          END
+        ) AS pending_submissions,
+
+        COUNT(
+          DISTINCT CASE
+            WHEN s.status = 'Rejected' THEN s.id
+          END
+        ) AS rejected_submissions
+
+      FROM hackathons h
+
+      LEFT JOIN submissions s
+        ON h.id = s.hackathon_id
+
+      GROUP BY
+        h.id,
+        h.name,
+        h.institution,
+        h.description,
+        h.start_date,
+        h.end_date,
+        h.registration_deadline,
+        h.mode,
+        h.location,
+        h.min_team_size,
+        h.max_team_size,
+        h.allow_external_participants,
+        h.registration_url,
+        h.poster_path,
+        h.is_active,
+        h.created_at
+
+      ORDER BY h.created_at DESC
+    `);
 
     res.json({
       success: true,
       count: hackathons.length,
       hackathons
     });
+
   } catch (error) {
     next(error);
   }
@@ -110,10 +202,18 @@ async function createHackathon(req, res, next) {
       isActive
     } = req.body;
 
-    if (!name || !institution || !startDate || !endDate || !registrationDeadline || !registrationUrl) {
+    if (
+      !name ||
+      !institution ||
+      !startDate ||
+      !endDate ||
+      !registrationDeadline ||
+      !registrationUrl
+    ) {
       return res.status(400).json({
         success: false,
-        message: 'Please provide all required hackathon fields (name, institution, dates, registration URL).'
+        message:
+          'Please provide all required hackathon fields (name, institution, dates, registration URL).'
       });
     }
 
@@ -123,18 +223,35 @@ async function createHackathon(req, res, next) {
     if (minTeam <= 0 || maxTeam < minTeam) {
       return res.status(400).json({
         success: false,
-        message: 'Minimum team size must be at least 1, and maximum must be greater than or equal to minimum.'
+        message:
+          'Minimum team size must be at least 1, and maximum must be greater than or equal to minimum.'
       });
     }
 
     let posterPath = null;
+
     if (req.file) {
       posterPath = req.file.filename;
     }
 
     const result = await query(
-      `INSERT INTO hackathons 
-       (name, institution, description, start_date, end_date, registration_deadline, mode, location, min_team_size, max_team_size, allow_external_participants, registration_url, poster_path, is_active)
+      `INSERT INTO hackathons
+       (
+         name,
+         institution,
+         description,
+         start_date,
+         end_date,
+         registration_deadline,
+         mode,
+         location,
+         min_team_size,
+         max_team_size,
+         allow_external_participants,
+         registration_url,
+         poster_path,
+         is_active
+       )
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         name.trim(),
@@ -147,10 +264,15 @@ async function createHackathon(req, res, next) {
         location ? location.trim() : '',
         minTeam,
         maxTeam,
-        allowExternalParticipants === 'true' || allowExternalParticipants === true ? 1 : 0,
+        allowExternalParticipants === 'true' ||
+          allowExternalParticipants === true
+          ? 1
+          : 0,
         registrationUrl.trim(),
         posterPath,
-        isActive === 'false' || isActive === false ? 0 : 1
+        isActive === 'false' || isActive === false
+          ? 0
+          : 1
       ]
     );
 
@@ -159,6 +281,7 @@ async function createHackathon(req, res, next) {
       message: 'Hackathon created successfully.',
       hackathonId: result.insertId
     });
+
   } catch (error) {
     next(error);
   }
@@ -171,6 +294,7 @@ async function createHackathon(req, res, next) {
 async function updateHackathon(req, res, next) {
   try {
     const { id } = req.params;
+
     const {
       name,
       institution,
@@ -187,44 +311,122 @@ async function updateHackathon(req, res, next) {
       isActive
     } = req.body;
 
-    const existing = await query('SELECT * FROM hackathons WHERE id = ?', [id]);
+    const existing = await query(
+      'SELECT * FROM hackathons WHERE id = ?',
+      [id]
+    );
+
     if (existing.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hackathon not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Hackathon not found.'
+      });
     }
 
     let posterPath = existing[0].poster_path;
+
     if (req.file) {
       posterPath = req.file.filename;
+
       // Remove old poster if it was custom
-      if (existing[0].poster_path && !existing[0].poster_path.startsWith('poster_sample_')) {
-        const oldPath = path.join(postersDir, existing[0].poster_path);
+      if (
+        existing[0].poster_path &&
+        !existing[0].poster_path.startsWith('poster_sample_')
+      ) {
+        const oldPath = path.join(
+          postersDir,
+          existing[0].poster_path
+        );
+
         if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (e) { console.warn('Could not delete old poster:', e); }
+          try {
+            fs.unlinkSync(oldPath);
+          } catch (e) {
+            console.warn(
+              'Could not delete old poster:',
+              e
+            );
+          }
         }
       }
     }
 
     await query(
       `UPDATE hackathons SET
-         name = ?, institution = ?, description = ?, start_date = ?, end_date = ?,
-         registration_deadline = ?, mode = ?, location = ?, min_team_size = ?, max_team_size = ?,
-         allow_external_participants = ?, registration_url = ?, poster_path = ?, is_active = ?
+         name = ?,
+         institution = ?,
+         description = ?,
+         start_date = ?,
+         end_date = ?,
+         registration_deadline = ?,
+         mode = ?,
+         location = ?,
+         min_team_size = ?,
+         max_team_size = ?,
+         allow_external_participants = ?,
+         registration_url = ?,
+         poster_path = ?,
+         is_active = ?
        WHERE id = ?`,
       [
-        name !== undefined ? name.trim() : existing[0].name,
-        institution !== undefined ? institution.trim() : existing[0].institution,
-        description !== undefined ? description.trim() : existing[0].description,
+        name !== undefined
+          ? name.trim()
+          : existing[0].name,
+
+        institution !== undefined
+          ? institution.trim()
+          : existing[0].institution,
+
+        description !== undefined
+          ? description.trim()
+          : existing[0].description,
+
         startDate || existing[0].start_date,
+
         endDate || existing[0].end_date,
-        registrationDeadline || existing[0].registration_deadline,
+
+        registrationDeadline ||
+        existing[0].registration_deadline,
+
         mode || existing[0].mode,
-        location !== undefined ? location.trim() : existing[0].location,
-        minTeamSize !== undefined ? parseInt(minTeamSize, 10) : existing[0].min_team_size,
-        maxTeamSize !== undefined ? parseInt(maxTeamSize, 10) : existing[0].max_team_size,
-        allowExternalParticipants !== undefined ? (allowExternalParticipants === 'true' || allowExternalParticipants === true ? 1 : 0) : existing[0].allow_external_participants,
-        registrationUrl !== undefined ? registrationUrl.trim() : existing[0].registration_url,
+
+        location !== undefined
+          ? location.trim()
+          : existing[0].location,
+
+        minTeamSize !== undefined
+          ? parseInt(minTeamSize, 10)
+          : existing[0].min_team_size,
+
+        maxTeamSize !== undefined
+          ? parseInt(maxTeamSize, 10)
+          : existing[0].max_team_size,
+
+        allowExternalParticipants !== undefined
+          ? (
+            allowExternalParticipants === 'true' ||
+              allowExternalParticipants === true
+              ? 1
+              : 0
+          )
+          : existing[0].allow_external_participants,
+
+        registrationUrl !== undefined
+          ? registrationUrl.trim()
+          : existing[0].registration_url,
+
         posterPath,
-        isActive !== undefined ? (isActive === 'false' || isActive === false || isActive === 0 ? 0 : 1) : existing[0].is_active,
+
+        isActive !== undefined
+          ? (
+            isActive === 'false' ||
+              isActive === false ||
+              isActive === 0
+              ? 0
+              : 1
+          )
+          : existing[0].is_active,
+
         id
       ]
     );
@@ -233,6 +435,7 @@ async function updateHackathon(req, res, next) {
       success: true,
       message: 'Hackathon updated successfully.'
     });
+
   } catch (error) {
     next(error);
   }
@@ -244,19 +447,33 @@ async function updateHackathon(req, res, next) {
 async function toggleHackathonStatus(req, res, next) {
   try {
     const { id } = req.params;
-    const existing = await query('SELECT id, is_active FROM hackathons WHERE id = ?', [id]);
+
+    const existing = await query(
+      'SELECT id, is_active FROM hackathons WHERE id = ?',
+      [id]
+    );
+
     if (existing.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hackathon not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Hackathon not found.'
+      });
     }
 
     const newStatus = existing[0].is_active ? 0 : 1;
-    await query('UPDATE hackathons SET is_active = ? WHERE id = ?', [newStatus, id]);
+
+    await query(
+      'UPDATE hackathons SET is_active = ? WHERE id = ?',
+      [newStatus, id]
+    );
 
     res.json({
       success: true,
-      message: `Hackathon is now ${newStatus ? 'Active' : 'Inactive'}.`,
+      message: `Hackathon is now ${newStatus ? 'Active' : 'Inactive'
+        }.`,
       isActive: Boolean(newStatus)
     });
+
   } catch (error) {
     next(error);
   }
@@ -268,18 +485,40 @@ async function toggleHackathonStatus(req, res, next) {
 async function deleteHackathon(req, res, next) {
   try {
     const { id } = req.params;
-    const existing = await query('SELECT id, poster_path FROM hackathons WHERE id = ?', [id]);
+
+    const existing = await query(
+      'SELECT id, poster_path FROM hackathons WHERE id = ?',
+      [id]
+    );
+
     if (existing.length === 0) {
-      return res.status(404).json({ success: false, message: 'Hackathon not found.' });
+      return res.status(404).json({
+        success: false,
+        message: 'Hackathon not found.'
+      });
     }
 
-    await query('DELETE FROM hackathons WHERE id = ?', [id]);
+    await query(
+      'DELETE FROM hackathons WHERE id = ?',
+      [id]
+    );
 
     // Delete poster file if present
-    if (existing[0].poster_path && !existing[0].poster_path.startsWith('poster_sample_')) {
-      const pPath = path.join(postersDir, existing[0].poster_path);
+    if (
+      existing[0].poster_path &&
+      !existing[0].poster_path.startsWith('poster_sample_')
+    ) {
+      const pPath = path.join(
+        postersDir,
+        existing[0].poster_path
+      );
+
       if (fs.existsSync(pPath)) {
-        try { fs.unlinkSync(pPath); } catch (e) {}
+        try {
+          fs.unlinkSync(pPath);
+        } catch (e) {
+          // Ignore file deletion errors
+        }
       }
     }
 
@@ -287,6 +526,7 @@ async function deleteHackathon(req, res, next) {
       success: true,
       message: 'Hackathon deleted successfully.'
     });
+
   } catch (error) {
     next(error);
   }
