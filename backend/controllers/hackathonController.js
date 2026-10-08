@@ -122,50 +122,21 @@ async function getAllHackathonsAdmin(req, res, next) {
         h.poster_path,
         h.is_active,
         h.created_at,
-
-        COUNT(DISTINCT s.id) AS total_submissions,
-
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Verified' THEN s.id
-          END
-        ) AS verified_submissions,
-
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Pending' THEN s.id
-          END
-        ) AS pending_submissions,
-
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Rejected' THEN s.id
-          END
-        ) AS rejected_submissions
-
+        COALESCE(stats.total_submissions, 0) AS total_submissions,
+        COALESCE(stats.verified_submissions, 0) AS verified_submissions,
+        COALESCE(stats.pending_submissions, 0) AS pending_submissions,
+        COALESCE(stats.rejected_submissions, 0) AS rejected_submissions
       FROM hackathons h
-
-      LEFT JOIN submissions s
-        ON h.id = s.hackathon_id
-
-      GROUP BY
-        h.id,
-        h.name,
-        h.institution,
-        h.description,
-        h.start_date,
-        h.end_date,
-        h.registration_deadline,
-        h.mode,
-        h.location,
-        h.min_team_size,
-        h.max_team_size,
-        h.allow_external_participants,
-        h.registration_url,
-        h.poster_path,
-        h.is_active,
-        h.created_at
-
+      LEFT JOIN (
+        SELECT
+          hackathon_id,
+          COUNT(id) AS total_submissions,
+          COUNT(CASE WHEN status = 'Verified' THEN 1 END) AS verified_submissions,
+          COUNT(CASE WHEN status = 'Pending' THEN 1 END) AS pending_submissions,
+          COUNT(CASE WHEN status = 'Rejected' THEN 1 END) AS rejected_submissions
+        FROM submissions
+        GROUP BY hackathon_id
+      ) stats ON h.id = stats.hackathon_id
       ORDER BY h.created_at DESC
     `);
 

@@ -16,11 +16,51 @@ const adminRoutes = require('./routes/adminRoutes');
 
 const app = express();
 
-// Enable CORS for frontend development and production
-app.use(cors({
-  origin: true,
-  credentials: true
-}));
+// Allowed origins for CORS in development and production
+const allowedOrigins = [
+  'https://student-screenshot-portal-frontend.onrender.com',
+  'https://student-screenshot-portal.onrender.com',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5000',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5000'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (such as mobile apps, server-to-server, curl)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith('.onrender.com') ||
+      config.nodeEnv !== 'production'
+    ) {
+      return callback(null, origin);
+    }
+
+    // Default to allow the request origin with reflection for credentials support
+    return callback(null, origin);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'X-Requested-With',
+    'Accept',
+    'Origin',
+    'Cache-Control'
+  ],
+  exposedHeaders: ['Content-Disposition'],
+  optionsSuccessStatus: 200
+};
+
+// Enable CORS middleware
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -34,6 +74,7 @@ if (!fs.existsSync(uploadsPath)) {
 app.use('/uploads', express.static(uploadsPath));
 
 // API Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/admin/auth', authRoutes);
 app.use('/api/auth/admin', authRoutes); // alias
 app.use('/api/students', studentRoutes);
@@ -47,6 +88,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     message: 'Student Screenshot Portal API is operational',
+    environment: config.nodeEnv,
     timestamp: new Date().toISOString()
   });
 });
@@ -77,4 +119,3 @@ async function startServer() {
 }
 
 startServer();
-

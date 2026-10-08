@@ -41,7 +41,7 @@ async function getHackathonParticipation(req, res, next) {
               t.id AS team_id
        FROM team_members tm
        JOIN teams t ON tm.team_id = t.id
-       JOIN submissions s ON t.submission_id = s.id
+       JOIN submissions s ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
        WHERE s.hackathon_id = ?
          AND s.status = 'Verified'
          AND tm.member_type = 'College'
@@ -56,7 +56,7 @@ async function getHackathonParticipation(req, res, next) {
               t.id AS team_id
        FROM team_members tm
        JOIN teams t ON tm.team_id = t.id
-       JOIN submissions s ON t.submission_id = s.id
+       JOIN submissions s ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
        WHERE s.hackathon_id = ?
          AND tm.member_type = 'College'
          AND tm.register_number IS NOT NULL AND tm.register_number != ''`,
@@ -186,7 +186,7 @@ async function getOverallParticipationMatrix(req, res, next) {
       SELECT tm.register_number, s.hackathon_id, s.submission_id
       FROM team_members tm
       JOIN teams t ON tm.team_id = t.id
-      JOIN submissions s ON t.submission_id = s.id
+      JOIN submissions s ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
       WHERE s.status = 'Verified'
         AND tm.member_type = 'College'
         AND tm.register_number IS NOT NULL
@@ -259,7 +259,7 @@ async function exportParticipationCsv(req, res, next) {
       `SELECT tm.register_number, s.submission_id, s.status, s.created_at
        FROM team_members tm
        JOIN teams t ON tm.team_id = t.id
-       JOIN submissions s ON t.submission_id = s.id
+       JOIN submissions s ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
        WHERE s.hackathon_id = ?
          AND s.status = 'Verified'
          AND tm.member_type = 'College'`,

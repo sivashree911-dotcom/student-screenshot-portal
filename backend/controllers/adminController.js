@@ -39,7 +39,7 @@ async function getDashboardOverview(req, res, next) {
       SELECT DISTINCT tm.register_number
       FROM team_members tm
       JOIN teams t ON tm.team_id = t.id
-      JOIN submissions s ON t.submission_id = s.id
+      JOIN submissions s ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
       WHERE s.status = 'Verified'
         AND tm.member_type = 'College'
         AND tm.register_number IS NOT NULL
@@ -78,8 +78,7 @@ async function getDashboardOverview(req, res, next) {
         : 0;
 
     // 4. Hackathon breakdown
-    // MySQL ONLY_FULL_GROUP_BY safe:
-    // Every non-aggregated selected column is included in GROUP BY.
+    // Fully sql_mode=only_full_group_by compliant via subquery aggregation
     const hackathonsBreakdown = await query(`
       SELECT
         h.id,
@@ -90,34 +89,21 @@ async function getDashboardOverview(req, res, next) {
         h.registration_deadline,
         h.is_active,
         h.created_at,
-        COUNT(DISTINCT s.id) AS total_submissions,
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Verified' THEN s.id
-          END
-        ) AS verified_submissions,
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Pending' THEN s.id
-          END
-        ) AS pending_submissions,
-        COUNT(
-          DISTINCT CASE
-            WHEN s.status = 'Rejected' THEN s.id
-          END
-        ) AS rejected_submissions
+        COALESCE(stats.total_submissions, 0) AS total_submissions,
+        COALESCE(stats.verified_submissions, 0) AS verified_submissions,
+        COALESCE(stats.pending_submissions, 0) AS pending_submissions,
+        COALESCE(stats.rejected_submissions, 0) AS rejected_submissions
       FROM hackathons h
-      LEFT JOIN submissions s
-        ON h.id = s.hackathon_id
-      GROUP BY
-        h.id,
-        h.name,
-        h.institution,
-        h.start_date,
-        h.end_date,
-        h.registration_deadline,
-        h.is_active,
-        h.created_at
+      LEFT JOIN (
+        SELECT
+          hackathon_id,
+          COUNT(id) AS total_submissions,
+          COUNT(CASE WHEN status = 'Verified' THEN 1 END) AS verified_submissions,
+          COUNT(CASE WHEN status = 'Pending' THEN 1 END) AS pending_submissions,
+          COUNT(CASE WHEN status = 'Rejected' THEN 1 END) AS rejected_submissions
+        FROM submissions
+        GROUP BY hackathon_id
+      ) stats ON h.id = stats.hackathon_id
       ORDER BY h.created_at DESC
       LIMIT 6
     `);

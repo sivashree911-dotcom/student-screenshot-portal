@@ -72,6 +72,9 @@ function sqliteAll(sql, params = []) {
 async function query(sql, params = []) {
   if (activeEngine === 'mysql' && mysqlPool) {
     const [results] = await mysqlPool.execute(sql, params);
+    if (Array.isArray(results)) {
+      results.rows = results;
+    }
     return results;
   }
 
@@ -86,7 +89,11 @@ async function query(sql, params = []) {
     trimmed.startsWith('PRAGMA') ||
     trimmed.startsWith('SHOW')
   ) {
-    return await sqliteAll(normalizedSql, params);
+    const rows = await sqliteAll(normalizedSql, params);
+    if (Array.isArray(rows)) {
+      rows.rows = rows;
+    }
+    return rows;
   }
 
   return await sqliteRun(normalizedSql, params);
@@ -102,7 +109,10 @@ async function getConnection() {
     return {
       query: async (sql, params = []) => {
         const [results] = await conn.execute(sql, params);
-        return [results];
+        if (Array.isArray(results)) {
+          results.rows = results;
+        }
+        return results;
       },
       beginTransaction: () => conn.beginTransaction(),
       commit: () => conn.commit(),
@@ -114,7 +124,7 @@ async function getConnection() {
   return {
     query: async (sql, params = []) => {
       const result = await query(sql, params);
-      return [result];
+      return result;
     },
     beginTransaction: async () => {
       await sqliteRun('BEGIN TRANSACTION');
@@ -133,7 +143,7 @@ function getPool() {
   return {
     query: async (sql, params = []) => {
       const result = await query(sql, params);
-      return [result];
+      return result;
     },
     getConnection
   };
