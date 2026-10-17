@@ -33,9 +33,16 @@ function errorHandler(err, req, res, next) {
 }
 
 function notFoundHandler(req, res, next) {
+  if (req.originalUrl.startsWith('/api')) {
+    return res.status(404).json({
+      success: false,
+      message: `API endpoint ${req.method} ${req.originalUrl} not found.`
+    });
+  }
+
   res.status(404).json({
     success: false,
-    message: `API endpoint ${req.originalUrl} not found.`
+    message: `Resource ${req.originalUrl} not found.`
   });
 }
 

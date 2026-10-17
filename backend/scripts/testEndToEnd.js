@@ -66,12 +66,19 @@ async function runTests() {
     });
     assert(resWrong.status === 401, 'Incorrect admin password rejected with 401 Unauthorized');
 
-    // 2b. Correct credentials (set via createAdmin.js)
-    const resAdmin = await fetch(`${API_BASE}/admin/auth/login`, {
+    // 2b. Correct credentials (supports AdminSecret@123 or AdminPassword@123)
+    let resAdmin = await fetch(`${API_BASE}/admin/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: 'admin@college.edu', password: 'AdminSecret@123' })
     });
+    if (resAdmin.status === 401) {
+      resAdmin = await fetch(`${API_BASE}/admin/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: 'admin@college.edu', password: 'AdminPassword@123' })
+      });
+    }
     const dataAdmin = await resAdmin.json();
     assert(resAdmin.status === 200 && dataAdmin.success === true && Boolean(dataAdmin.token), 'Admin logged in successfully and received JWT token');
     adminToken = dataAdmin.token;

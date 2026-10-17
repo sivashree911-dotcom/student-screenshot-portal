@@ -276,9 +276,46 @@ node backend/scripts/testEndToEnd.js
 
 ---
 
+## 🌐 Production Deployment on Render
+
+### Architecture: Unified Full-Stack Service (Recommended)
+In this configuration, a single Render Web Service builds both the React frontend and Node backend, serving both the student portal, admin dashboard, and Express API on a single URL (e.g. `https://student-screenshot-portal.onrender.com`).
+
+#### 1-Click / Blueprint Deployment (Easiest):
+1. Connect your GitHub repository to Render.
+2. Select **New** > **Blueprint** and point to this repository.
+3. Render reads `render.yaml` and configures the build, start commands, health checks, and environment variables automatically.
+
+#### Manual Web Service Deployment:
+1. In the Render Dashboard, click **New** > **Web Service**.
+2. Connect your GitHub repository.
+3. Configure settings:
+   * **Name**: `student-screenshot-portal`
+   * **Region**: Oregon (or closest to your MySQL database)
+   * **Branch**: `main`
+   * **Root Directory**: *(Leave blank / empty)*
+   * **Runtime**: `Node`
+   * **Build Command**: `npm run build`
+   * **Start Command**: `npm start`
+   * **Health Check Path**: `/api/health`
+4. In **Environment Variables**, add:
+   * `NODE_ENV`: `production`
+   * `PORT`: `5000`
+   * `DB_HOST`: Your MySQL host (e.g. Aiven hostname)
+   * `DB_PORT`: Your MySQL port (e.g. `3306` or Aiven custom port)
+   * `DB_USER`: Your MySQL user (e.g. `root` or `avnadmin`)
+   * `DB_PASSWORD`: Your MySQL password
+   * `DB_NAME`: Your MySQL database name (e.g. `defaultdb` or `student_screenshot_portal`)
+   * `JWT_SECRET`: A strong random string for signing JWT tokens
+   * `APPS_SCRIPT_API_URL`: Your Google Apps Script Web App URL
+5. Click **Deploy Web Service**.
+
+---
+
 ## 🛡️ Security Architecture
 
 * **No Student Admin Exposure**: Zero admin links, buttons, or hints in student navigation.
 * **Server-Side Validation**: Team sizes, register numbers, duplicate entries, file formats, and sizes are validated on the backend.
 * **Safe File Storage**: Multer generates sanitized, collision-resistant server-side filenames and validates MIME types and 5MB size limits.
 * **Authentication**: Bcrypt password hashing (10 rounds) and signed JWT tokens with expiration.
+

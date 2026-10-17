@@ -8,6 +8,10 @@ const config = require('./config');
 let activeEngine = 'mysql';
 let mysqlPool = null;
 let sqliteDb = null;
+let dbConnected = false;
+let dbLastError = null;
+let reconnectTimer = null;
+let isInitializing = false;
 
 // ---------------------------------------------------------
 // SQLite local data directory (Development Fallback Only)
@@ -21,7 +25,7 @@ if (!fs.existsSync(dataDir)) {
 const sqliteFilePath = path.join(dataDir, 'portal.sqlite');
 
 // ---------------------------------------------------------
-// SQLite adapter
+// SQLite adapter (Development only)
 // ---------------------------------------------------------
 function initSqliteAdapter() {
   return new Promise((resolve, reject) => {
@@ -31,14 +35,13 @@ function initSqliteAdapter() {
       }
 
       activeEngine = 'sqlite';
+      dbConnected = true;
+      dbLastError = null;
       resolve(sqliteDb);
     });
   });
 }
 
-// ---------------------------------------------------------
-// SQLite helpers
-// ---------------------------------------------------------
 function sqliteRun(sql, params = []) {
   return new Promise((resolve, reject) => {
     sqliteDb.run(sql, params, function (err) {
@@ -67,15 +70,114 @@ function sqliteAll(sql, params = []) {
 }
 
 // ---------------------------------------------------------
+// Diagnostic Error Logger
+// ---------------------------------------------------------
+function logDetailedDatabaseError(err, host, port) {
+  console.error('================================================================');
+  console.error(`❌ [DATABASE ERROR] Failed to connect to MySQL at ${host}:${port}`);
+  console.error(`   Error Code:    ${err.code || 'UNKNOWN'}`);
+  console.error(`   Error Message: ${err.message}`);
+
+  if (config.db.isPlaceholder) {
+    console.error('   🔎 DIAGNOSIS: Placeholder hostname detected ("your-aiven-db-hostname.aivencloud.com").');
+    console.error('   👉 FIX: Replace DB_HOST in Render Environment Variables with your actual Aiven MySQL host.');
+  } else if (err.code === 'ENOTFOUND') {
+    console.error('   🔎 DIAGNOSIS: DNS host resolution failed (ENOTFOUND).');
+    console.error('   Possible reasons:');
+    console.error('   1. The Aiven MySQL service is Powered Off or Paused in console.aiven.io.');
+    console.error('   2. The Aiven service was deleted or recreated with a new hostname, but Render has the old DB_HOST.');
+    console.error('   3. There is a typo or extra characters in DB_HOST or DATABASE_URL in Render Environment Variables.');
+    console.error('   👉 FIX: Open Aiven Console (console.aiven.io), ensure status is RUNNING, and verify DB_HOST / DB_PORT in Render.');
+  } else if (err.code === 'ECONNREFUSED') {
+    console.error('   🔎 DIAGNOSIS: Connection refused (ECONNREFUSED).');
+    console.error(`   The host is reachable, but port ${port} refused the connection.`);
+    console.error('   👉 FIX: Verify DB_PORT in Render. Note: Aiven assigns custom ports (e.g. 15234), not 3306.');
+  } else if (err.code === 'ER_ACCESS_DENIED_ERROR' || err.errno === 1045) {
+    console.error('   🔎 DIAGNOSIS: Access denied / Bad credentials (1045).');
+    console.error('   👉 FIX: Verify DB_USER (typically "avnadmin") and DB_PASSWORD in Render Environment Variables.');
+  } else if (err.code === 'ETIMEDOUT' || err.code === 'CONNECT_TIMEOUT') {
+    console.error('   🔎 DIAGNOSIS: Connection timed out.');
+    console.error('   👉 FIX: Check firewall / IP allowances on database provider and ensure service is active.');
+  } else if (err.code === 'HANDSHAKE_ERROR' || (err.message && err.message.toLowerCase().includes('ssl'))) {
+    console.error('   🔎 DIAGNOSIS: SSL/TLS negotiation error.');
+    console.error('   👉 FIX: Ensure DB_SSL is set to "true" in Render Environment Variables.');
+  }
+  console.error('================================================================');
+}
+
+// ---------------------------------------------------------
+// Background Reconnection Scheduler
+// ---------------------------------------------------------
+function scheduleReconnect() {
+  if (reconnectTimer) return;
+
+  const retrySeconds = 20;
+  console.log(`⏳ [DB] Background reconnect scheduled in ${retrySeconds}s...`);
+
+  reconnectTimer = setTimeout(async () => {
+    reconnectTimer = null;
+    console.log('🔄 [DB] Attempting scheduled database reconnection...');
+    try {
+      await initDatabase();
+    } catch (e) {
+      // Errors logged within initDatabase
+    }
+  }, retrySeconds * 1000);
+}
+
+// ---------------------------------------------------------
 // Unified SQL query
 // ---------------------------------------------------------
 async function query(sql, params = []) {
-  if (activeEngine === 'mysql' && mysqlPool) {
-    const [results] = await mysqlPool.execute(sql, params);
-    if (Array.isArray(results)) {
-      results.rows = results;
+  const isProduction = config.isProduction || process.env.NODE_ENV === 'production';
+
+  if (activeEngine === 'mysql') {
+    if (!mysqlPool || !dbConnected) {
+      const err = new Error(
+        `Database service is currently unavailable. Persistent MySQL is not connected${
+          dbLastError ? ` (${dbLastError.code || dbLastError.message})` : ''
+        }.`
+      );
+      err.status = 503;
+      err.code = dbLastError ? dbLastError.code : 'DB_DISCONNECTED';
+      throw err;
     }
-    return results;
+
+    try {
+      const [results] = await mysqlPool.execute(sql, params);
+      if (Array.isArray(results)) {
+        results.rows = results;
+      }
+      return results;
+    } catch (queryErr) {
+      // Detect disconnection during active queries and schedule healing
+      if (
+        queryErr.code === 'PROTOCOL_CONNECTION_LOST' ||
+        queryErr.code === 'ECONNRESET' ||
+        queryErr.code === 'ETIMEDOUT' ||
+        queryErr.code === 'EPIPE'
+      ) {
+        console.warn(`⚠️ [DB] Connection dropped during query execution: ${queryErr.code}`);
+        dbConnected = false;
+        dbLastError = queryErr;
+        scheduleReconnect();
+      }
+      throw queryErr;
+    }
+  }
+
+  // In production, strictly enforce persistent external MySQL (never silent SQLite fallback)
+  if (isProduction) {
+    const err = new Error(
+      'Database service is currently unavailable. Production requires an active persistent MySQL connection.'
+    );
+    err.status = 503;
+    throw err;
+  }
+
+  // Development SQLite fallback query handling
+  if (!sqliteDb) {
+    await initSqliteAdapter();
   }
 
   const normalizedSql = sql
@@ -103,7 +205,19 @@ async function query(sql, params = []) {
 // Transaction & Connection helpers
 // ---------------------------------------------------------
 async function getConnection() {
-  if (activeEngine === 'mysql' && mysqlPool) {
+  const isProduction = config.isProduction || process.env.NODE_ENV === 'production';
+
+  if (activeEngine === 'mysql') {
+    if (!mysqlPool || !dbConnected) {
+      const err = new Error(
+        `Database service is currently unavailable. Persistent MySQL is not connected${
+          dbLastError ? ` (${dbLastError.code || dbLastError.message})` : ''
+        }.`
+      );
+      err.status = 503;
+      throw err;
+    }
+
     const conn = await mysqlPool.getConnection();
 
     return {
@@ -121,6 +235,14 @@ async function getConnection() {
     };
   }
 
+  if (isProduction) {
+    const err = new Error(
+      'Database service is currently unavailable. Production requires an active persistent MySQL connection.'
+    );
+    err.status = 503;
+    throw err;
+  }
+
   return {
     query: async (sql, params = []) => {
       const result = await query(sql, params);
@@ -135,7 +257,7 @@ async function getConnection() {
     rollback: async () => {
       await sqliteRun('ROLLBACK');
     },
-    release: () => { }
+    release: () => {}
   };
 }
 
@@ -153,21 +275,16 @@ function getPool() {
 // Database initialization
 // ---------------------------------------------------------
 async function initDatabase() {
-  const isProduction = config.isProduction || process.env.NODE_ENV === 'production';
-
-  if (isProduction) {
-    console.log('[DB] Production database: MYSQL');
+  if (isInitializing) {
+    return dbConnected;
   }
 
-  console.log(
-    `[DB] Attempting MySQL connection at ${config.db.host}:${config.db.port}...`
-  );
+  isInitializing = true;
+  const isProduction = config.isProduction || process.env.NODE_ENV === 'production';
 
-  let connectedToMysql = false;
+  console.log(`[DB] Engine target: ${isProduction ? 'Production MySQL' : 'MySQL with dev fallback'}`);
+  console.log(`[DB] Connecting to MySQL at ${config.db.host}:${config.db.port} (database: "${config.db.database}")...`);
 
-  // -------------------------------------------------------
-  // Try connecting to MySQL
-  // -------------------------------------------------------
   try {
     const poolConfig = {
       host: config.db.host,
@@ -176,7 +293,7 @@ async function initDatabase() {
       password: config.db.password,
       database: config.db.database,
       waitForConnections: config.db.waitForConnections !== undefined ? config.db.waitForConnections : true,
-      connectionLimit: config.db.connectionLimit || 15,
+      connectionLimit: config.db.connectionLimit || 10,
       queueLimit: config.db.queueLimit || 0,
       timezone: config.db.timezone || '+00:00',
       dateStrings: true,
@@ -189,223 +306,255 @@ async function initDatabase() {
       poolConfig.ssl = config.db.ssl;
     }
 
-    // Attempt direct pool connection with database name
+    // Close any previous pool before re-creating
+    if (mysqlPool) {
+      try {
+        await mysqlPool.end();
+      } catch (e) {
+        // Ignore pool close error
+      }
+    }
+
     mysqlPool = mysql.createPool(poolConfig);
 
     try {
       const connTest = await mysqlPool.getConnection();
       connTest.release();
-      connectedToMysql = true;
+      dbConnected = true;
+      dbLastError = null;
       activeEngine = 'mysql';
     } catch (poolErr) {
-      // If error is code ER_BAD_DB_ERROR (database does not exist yet), try creating it (useful in local dev)
+      // If code is ER_BAD_DB_ERROR, attempt database creation if permissions allow
       if (poolErr.code === 'ER_BAD_DB_ERROR' || poolErr.errno === 1049) {
         console.log(`[DB] Database "${config.db.database}" not found. Attempting creation...`);
-        const rootConn = await mysql.createConnection({
-          host: config.db.host,
-          port: config.db.port,
-          user: config.db.user,
-          password: config.db.password,
-          ssl: config.db.ssl,
-          connectTimeout: 10000
-        });
+        try {
+          const rootConn = await mysql.createConnection({
+            host: config.db.host,
+            port: config.db.port,
+            user: config.db.user,
+            password: config.db.password,
+            ssl: config.db.ssl,
+            connectTimeout: 10000
+          });
 
-        await rootConn.query(
-          `CREATE DATABASE IF NOT EXISTS \`${config.db.database}\`
-           CHARACTER SET utf8mb4
-           COLLATE utf8mb4_unicode_ci;`
-        );
-        await rootConn.end();
+          await rootConn.query(
+            `CREATE DATABASE IF NOT EXISTS \`${config.db.database}\`
+             CHARACTER SET utf8mb4
+             COLLATE utf8mb4_unicode_ci;`
+          );
+          await rootConn.end();
 
-        // Retry connection
-        const connTest = await mysqlPool.getConnection();
-        connTest.release();
-        connectedToMysql = true;
-        activeEngine = 'mysql';
+          const connTest2 = await mysqlPool.getConnection();
+          connTest2.release();
+          dbConnected = true;
+          dbLastError = null;
+          activeEngine = 'mysql';
+        } catch (createErr) {
+          throw poolErr;
+        }
       } else {
         throw poolErr;
       }
     }
 
-    console.log('[DB] Connected successfully');
-  } catch (mysqlErr) {
-    if (isProduction) {
-      console.error(
-        `❌ [DB] FATAL DATABASE ERROR: Could not connect to production MySQL at ${config.db.host}:${config.db.port}`
-      );
-      console.error(`❌ [DB] Error Details: ${mysqlErr.message}`);
-      console.error('❌ [DB] Production requires external persistent MySQL (Aiven MySQL). Halting startup.');
-      process.exit(1);
+    console.log(`✓ [DB] Connected successfully to MySQL (${config.db.host}:${config.db.port}/${config.db.database})`);
+
+    // If a reconnect timer was active, clear it
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
     }
 
-    console.warn('⚠️ [DB] MySQL connection unsuccessful:', mysqlErr.message);
-    console.log('ℹ️ [DB] Using SQLite fallback database.');
+  } catch (mysqlErr) {
+    dbConnected = false;
+    dbLastError = mysqlErr;
 
-    await initSqliteAdapter();
+    logDetailedDatabaseError(mysqlErr, config.db.host, config.db.port);
 
-    console.log(`✓ [DB] SQLite database initialized at: ${sqliteFilePath}`);
+    if (isProduction) {
+      console.warn('⚠️ [DB] Server will keep running and retry connecting in background.');
+      scheduleReconnect();
+      isInitializing = false;
+      return false;
+    }
+
+    // In local development, fall back to SQLite
+    console.warn('⚠️ [DB] MySQL unavailable in development. Initializing local SQLite fallback...');
+    try {
+      await initSqliteAdapter();
+      console.log(`✓ [DB] SQLite fallback database active at: ${sqliteFilePath}`);
+    } catch (sqliteErr) {
+      console.error('❌ [DB] SQLite initialization failed:', sqliteErr.message);
+      isInitializing = false;
+      return false;
+    }
   }
 
   // =======================================================
   // 1. MYSQL SCHEMA INITIALIZATION
   // =======================================================
-  if (activeEngine === 'mysql') {
-    // 1. Administrators
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS admins (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(100) NOT NULL,
-        email VARCHAR(150) NOT NULL UNIQUE,
-        password_hash VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB;
-    `);
-
-    // 2. Students (Reference table)
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS students (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        register_number VARCHAR(50) NOT NULL UNIQUE,
-        name VARCHAR(150) NOT NULL,
-        email VARCHAR(150),
-        department VARCHAR(100),
-        year VARCHAR(10),
-        section VARCHAR(10),
-        status VARCHAR(50) DEFAULT 'Active',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_students_reg (register_number)
-      ) ENGINE=InnoDB;
-    `);
-
-    // 3. Hackathons
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS hackathons (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        institution VARCHAR(255) NOT NULL,
-        description TEXT,
-        start_date DATE NOT NULL,
-        end_date DATE NOT NULL,
-        registration_deadline DATE NOT NULL,
-        mode ENUM('Online', 'Offline', 'Hybrid') NOT NULL DEFAULT 'Offline',
-        location VARCHAR(255),
-        min_team_size INT NOT NULL DEFAULT 1,
-        max_team_size INT NOT NULL DEFAULT 5,
-        allow_external_participants BOOLEAN NOT NULL DEFAULT FALSE,
-        registration_url TEXT NOT NULL,
-        poster_path VARCHAR(500),
-        is_active BOOLEAN NOT NULL DEFAULT TRUE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_hackathon_active (is_active),
-        INDEX idx_hackathon_dates (start_date, end_date, registration_deadline)
-      ) ENGINE=InnoDB;
-    `);
-
-    // 4. Submissions
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS submissions (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        submission_id VARCHAR(50) NOT NULL UNIQUE,
-        student_register_number VARCHAR(50) NOT NULL,
-        student_name VARCHAR(150) NULL,
-        student_email VARCHAR(150) NULL,
-        hackathon_id INT NOT NULL,
-        screenshot_path VARCHAR(500) NOT NULL,
-        status ENUM('Pending', 'Verified', 'Rejected') NOT NULL DEFAULT 'Pending',
-        rejection_reason TEXT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-        INDEX idx_sub_student_reg (student_register_number),
-        INDEX idx_sub_student_email (student_email),
-        INDEX idx_sub_hackathon (hackathon_id),
-        INDEX idx_sub_status (status),
-        CONSTRAINT fk_submission_hackathon
-          FOREIGN KEY (hackathon_id)
-          REFERENCES hackathons(id)
-          ON DELETE CASCADE
-      ) ENGINE=InnoDB;
-    `);
-
-    // 5. Teams
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS teams (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        submission_id INT NOT NULL,
-        team_size INT NOT NULL DEFAULT 1,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        CONSTRAINT fk_teams_submission
-          FOREIGN KEY (submission_id)
-          REFERENCES submissions(id)
-          ON DELETE CASCADE
-      ) ENGINE=InnoDB;
-    `);
-
-    // 6. Team Members
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS team_members (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        team_id INT NOT NULL,
-        register_number VARCHAR(50) NULL,
-        name VARCHAR(150) NOT NULL,
-        department VARCHAR(100),
-        year VARCHAR(10),
-        section VARCHAR(10),
-        member_type ENUM('College', 'External') NOT NULL DEFAULT 'College',
-        institution VARCHAR(255),
-        email VARCHAR(150),
-        is_captain BOOLEAN NOT NULL DEFAULT FALSE,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        INDEX idx_tm_reg_no (register_number),
-        INDEX idx_tm_type (member_type),
-        INDEX idx_tm_captain (is_captain),
-        CONSTRAINT fk_tm_team
-          FOREIGN KEY (team_id)
-          REFERENCES teams(id)
-          ON DELETE CASCADE
-      ) ENGINE=InnoDB;
-    `);
-
-    // 7. Settings
-    await mysqlPool.query(`
-      CREATE TABLE IF NOT EXISTS settings (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        setting_key VARCHAR(100) NOT NULL UNIQUE,
-        setting_value TEXT NULL,
-        description VARCHAR(255) NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-      ) ENGINE=InnoDB;
-    `);
-
-    // Safe migrations for existing MySQL tables
+  if (activeEngine === 'mysql' && dbConnected) {
     try {
-      await mysqlPool.query('ALTER TABLE submissions MODIFY COLUMN screenshot_path VARCHAR(500) NOT NULL');
-    } catch (e) { }
+      // 1. Administrators
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS admins (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(100) NOT NULL,
+          email VARCHAR(150) NOT NULL UNIQUE,
+          password_hash VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
 
-    try {
-      await mysqlPool.query('ALTER TABLE hackathons MODIFY COLUMN poster_path VARCHAR(500) NULL');
-    } catch (e) { }
+      // 2. Students (Reference table)
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS students (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          register_number VARCHAR(50) NOT NULL UNIQUE,
+          name VARCHAR(150) NOT NULL,
+          email VARCHAR(150),
+          department VARCHAR(100),
+          year VARCHAR(10),
+          section VARCHAR(10),
+          status VARCHAR(50) DEFAULT 'Active',
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_students_reg (register_number)
+        ) ENGINE=InnoDB;
+      `);
 
-    try {
-      await mysqlPool.query('ALTER TABLE submissions ADD COLUMN student_name VARCHAR(150) NULL');
-    } catch (e) { }
+      // 3. Hackathons
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS hackathons (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          institution VARCHAR(255) NOT NULL,
+          description TEXT,
+          start_date DATE NOT NULL,
+          end_date DATE NOT NULL,
+          registration_deadline DATE NOT NULL,
+          mode ENUM('Online', 'Offline', 'Hybrid') NOT NULL DEFAULT 'Offline',
+          location VARCHAR(255),
+          min_team_size INT NOT NULL DEFAULT 1,
+          max_team_size INT NOT NULL DEFAULT 5,
+          allow_external_participants BOOLEAN NOT NULL DEFAULT FALSE,
+          registration_url TEXT NOT NULL,
+          poster_path VARCHAR(500),
+          is_active BOOLEAN NOT NULL DEFAULT TRUE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_hackathon_active (is_active),
+          INDEX idx_hackathon_dates (start_date, end_date, registration_deadline)
+        ) ENGINE=InnoDB;
+      `);
 
-    try {
-      await mysqlPool.query('ALTER TABLE submissions ADD COLUMN student_email VARCHAR(150) NULL');
-    } catch (e) { }
+      // 4. Submissions
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS submissions (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          submission_id VARCHAR(50) NOT NULL UNIQUE,
+          student_register_number VARCHAR(50) NOT NULL,
+          student_name VARCHAR(150) NULL,
+          student_email VARCHAR(150) NULL,
+          hackathon_id INT NOT NULL,
+          screenshot_path VARCHAR(500) NOT NULL,
+          status ENUM('Pending', 'Verified', 'Rejected') NOT NULL DEFAULT 'Pending',
+          rejection_reason TEXT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_sub_student_reg (student_register_number),
+          INDEX idx_sub_student_email (student_email),
+          INDEX idx_sub_hackathon (hackathon_id),
+          INDEX idx_sub_status (status),
+          CONSTRAINT fk_submission_hackathon
+            FOREIGN KEY (hackathon_id)
+            REFERENCES hackathons(id)
+            ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
 
-    try {
-      await mysqlPool.query('ALTER TABLE submissions ADD COLUMN rejection_reason TEXT NULL');
-    } catch (e) { }
+      // 5. Teams
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS teams (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          submission_id INT NOT NULL,
+          team_size INT NOT NULL DEFAULT 1,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT fk_teams_submission
+            FOREIGN KEY (submission_id)
+            REFERENCES submissions(id)
+            ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      // 6. Team Members
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS team_members (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          team_id INT NOT NULL,
+          register_number VARCHAR(50) NULL,
+          name VARCHAR(150) NOT NULL,
+          department VARCHAR(100),
+          year VARCHAR(10),
+          section VARCHAR(10),
+          member_type ENUM('College', 'External') NOT NULL DEFAULT 'College',
+          institution VARCHAR(255),
+          email VARCHAR(150),
+          is_captain BOOLEAN NOT NULL DEFAULT FALSE,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          INDEX idx_tm_reg_no (register_number),
+          INDEX idx_tm_type (member_type),
+          INDEX idx_tm_captain (is_captain),
+          CONSTRAINT fk_tm_team
+            FOREIGN KEY (team_id)
+            REFERENCES teams(id)
+            ON DELETE CASCADE
+        ) ENGINE=InnoDB;
+      `);
+
+      // 7. Settings
+      await mysqlPool.query(`
+        CREATE TABLE IF NOT EXISTS settings (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          setting_key VARCHAR(100) NOT NULL UNIQUE,
+          setting_value TEXT NULL,
+          description VARCHAR(255) NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB;
+      `);
+
+      // Safe non-destructive column migrations for existing databases
+      try {
+        await mysqlPool.query('ALTER TABLE submissions MODIFY COLUMN screenshot_path VARCHAR(500) NOT NULL');
+      } catch (e) {}
+
+      try {
+        await mysqlPool.query('ALTER TABLE hackathons MODIFY COLUMN poster_path VARCHAR(500) NULL');
+      } catch (e) {}
+
+      try {
+        await mysqlPool.query('ALTER TABLE submissions ADD COLUMN student_name VARCHAR(150) NULL');
+      } catch (e) {}
+
+      try {
+        await mysqlPool.query('ALTER TABLE submissions ADD COLUMN student_email VARCHAR(150) NULL');
+      } catch (e) {}
+
+      try {
+        await mysqlPool.query('ALTER TABLE submissions ADD COLUMN rejection_reason TEXT NULL');
+      } catch (e) {}
+
+    } catch (schemaErr) {
+      console.error('❌ [DB] Error during MySQL schema verification:', schemaErr.message);
+    }
   }
 
   // =======================================================
-  // 2. SQLITE SCHEMA INITIALIZATION (Development Fallback)
+  // 2. SQLITE SCHEMA INITIALIZATION (Development Fallback Only)
   // =======================================================
-  else {
+  else if (activeEngine === 'sqlite' && dbConnected) {
     // 1. Admins
     await sqliteRun(`
       CREATE TABLE IF NOT EXISTS admins (
@@ -520,37 +669,65 @@ async function initDatabase() {
 
   // =======================================================
   // ADMIN SETUP
-  // Admin is created/updated ONLY when environment variables are provided.
+  // Auto-configured only when environment variables are provided
   // =======================================================
-  const adminName = process.env.ADMIN_NAME;
-  const adminEmail = process.env.ADMIN_EMAIL;
-  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (dbConnected) {
+    const adminName = (config.admin && config.admin.name) || process.env.ADMIN_NAME;
+    const adminEmail = (config.admin && config.admin.email) || process.env.ADMIN_EMAIL;
+    const adminPassword = (config.admin && config.admin.password) || process.env.ADMIN_PASSWORD;
 
-  if (adminName && adminEmail && adminPassword) {
-    const existingAdmins = await query(
-      'SELECT id FROM admins WHERE email = ? LIMIT 1',
-      [adminEmail]
-    );
+    if (adminName && adminEmail && adminPassword) {
+      try {
+        const existingAdmins = await query(
+          'SELECT id FROM admins WHERE email = ? LIMIT 1',
+          [adminEmail]
+        );
 
-    const passwordHash = await bcrypt.hash(adminPassword, 12);
+        const passwordHash = await bcrypt.hash(adminPassword, 12);
 
-    if (existingAdmins.length === 0) {
-      await query(
-        `INSERT INTO admins (name, email, password_hash) VALUES (?, ?, ?)`,
-        [adminName, adminEmail, passwordHash]
-      );
-      console.log(`✓ [DB] Admin account created: ${adminEmail}`);
-    } else {
-      await query(
-        `UPDATE admins SET name = ?, password_hash = ? WHERE email = ?`,
-        [adminName, passwordHash, adminEmail]
-      );
-      console.log(`✓ [DB] Admin account updated: ${adminEmail}`);
+        if (existingAdmins.length === 0) {
+          await query(
+            `INSERT INTO admins (name, email, password_hash) VALUES (?, ?, ?)`,
+            [adminName, adminEmail, passwordHash]
+          );
+          console.log(`✓ [DB] Admin account created: ${adminEmail}`);
+        } else {
+          await query(
+            `UPDATE admins SET name = ?, password_hash = ? WHERE email = ?`,
+            [adminName, passwordHash, adminEmail]
+          );
+          console.log(`✓ [DB] Admin account updated: ${adminEmail}`);
+        }
+      } catch (adminErr) {
+        console.error('⚠️ [DB] Warning: Could not auto-create admin account:', adminErr.message);
+      }
     }
   }
 
-  console.log('[DB] Database ready');
-  return true;
+  isInitializing = false;
+  if (dbConnected) {
+    console.log('[DB] Database ready');
+  }
+  return dbConnected;
+}
+
+// ---------------------------------------------------------
+// Helper for Health Checks
+// ---------------------------------------------------------
+function getDbStatus() {
+  const hostDisplay = config.db.host
+    ? String(config.db.host).replace(/^(.*?)(\.[^.]+\.[^.]+)$/, '***$2')
+    : 'not-configured';
+
+  return {
+    connected: dbConnected,
+    engine: activeEngine,
+    host: hostDisplay,
+    port: config.db.port,
+    database: config.db.database,
+    error: dbLastError ? (dbLastError.code || dbLastError.message) : null,
+    isProduction: config.isProduction
+  };
 }
 
 module.exports = {
@@ -558,5 +735,6 @@ module.exports = {
   query,
   getConnection,
   initDatabase,
-  getActiveEngine: () => activeEngine
+  getActiveEngine: () => activeEngine,
+  getDbStatus
 };

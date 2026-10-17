@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStudentAuth } from '../context/StudentAuthContext';
 import { api } from '../services/api';
-import { Layers, ArrowRight, ShieldAlert, CheckCircle2, Loader2, Award, Sparkles } from 'lucide-react';
+import { Layers, ArrowRight, ShieldAlert, CheckCircle2, Loader2 } from 'lucide-react';
 
 export default function StudentVerify() {
   const [registerNumber, setRegisterNumber] = useState('');
@@ -40,9 +40,21 @@ export default function StudentVerify() {
         setErrorMessage(res.message || 'Register Number not found.\n\nPlease contact the administrator.');
       }
     } catch (err) {
-      setErrorMessage(
-        err.message || 'Register Number not found.\n\nPlease contact the administrator.'
-      );
+      if (err.isNetworkError) {
+        setErrorMessage(err.message);
+      } else if (err.status === 404) {
+        setErrorMessage(
+          err.message || 'Register Number not found in the approved student list.\n\nPlease contact the administrator.'
+        );
+      } else if (err.status === 503) {
+        setErrorMessage(
+          err.message || 'Student verification service is temporarily unavailable. Please try again shortly.'
+        );
+      } else {
+        setErrorMessage(
+          err.message || 'Verification failed. Please contact the administrator.'
+        );
+      }
     } finally {
       setLoading(false);
     }

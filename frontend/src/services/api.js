@@ -11,30 +11,40 @@
 function getApiBaseUrl() {
   const envUrl = import.meta.env.VITE_API_URL;
   if (envUrl && envUrl.trim()) {
-    return envUrl.trim();
+    return envUrl.trim().replace(/\/+$/, '');
   }
 
-  // If in browser and not running on localhost/127.0.0.1, use production Render backend
+  // In browser environment:
   if (
     typeof window !== 'undefined' &&
     window.location &&
-    window.location.hostname &&
-    window.location.hostname !== 'localhost' &&
-    window.location.hostname !== '127.0.0.1'
+    window.location.hostname
   ) {
-    return 'https://student-screenshot-portal.onrender.com';
+    const hostname = window.location.hostname;
+
+    // 1. If running locally (Vite dev server proxies /api and /uploads to port 5000)
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return '';
+    }
+
+    // 2. If hosted on a separated frontend-only static site (e.g. -frontend.onrender.com)
+    if (hostname.includes('-frontend.')) {
+      return 'https://student-screenshot-portal.onrender.com';
+    }
+
+    // 3. If served directly by the unified fullstack web service on Render or custom domain:
+    // Relative path '' guarantees all API requests hit the hosting server with no CORS issues
+    return '';
   }
 
-  // If Vite build is in production mode
-  if (import.meta.env.PROD) {
-    return 'https://student-screenshot-portal.onrender.com';
-  }
-
-  return 'http://localhost:5000';
+  return '';
 }
 
 const configuredApiUrl = getApiBaseUrl();
-const API_BASE = `${configuredApiUrl.replace(/\/+$/, '')}/api`;
+// Avoid duplicate /api segments if configuredApiUrl already ends with /api
+const API_BASE = configuredApiUrl
+  ? (configuredApiUrl.endsWith('/api') ? configuredApiUrl : `${configuredApiUrl}/api`)
+  : '/api';
 
 async function request(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
@@ -78,9 +88,12 @@ async function request(endpoint, options = {}) {
     });
   } catch (networkError) {
     console.error(`[API Network Error] URL: ${url}`, networkError);
-    throw new Error(
+    const err = new Error(
       `Unable to connect to server at ${configuredApiUrl}. Please ensure the server is active.`
     );
+    err.isNetworkError = true;
+    err.status = 0;
+    throw err;
   }
 
   const contentType = response.headers.get('content-type') || '';
@@ -95,19 +108,32 @@ async function request(endpoint, options = {}) {
   try {
     data = await response.json();
   } catch (err) {
-    throw new Error(
-      `Invalid response from server. HTTP ${response.status}`
+    const parseErr = new Error(
+      `Invalid response from server (HTTP ${response.status}).`
     );
+    parseErr.status = response.status;
+    parseErr.isNetworkError = false;
+    throw parseErr;
   }
 
   if (!response.ok) {
-    const error = new Error(
-      data.message || `HTTP ${response.status} Error`
-    );
+    let errorMsg = data && data.message;
+    if (!errorMsg) {
+      if (response.status === 503) {
+        errorMsg = 'Database service is temporarily unavailable. Please verify database connection.';
+      } else if (response.status === 401) {
+        errorMsg = 'Invalid credentials or unauthorized access.';
+      } else if (response.status === 404) {
+        errorMsg = 'Requested resource not found.';
+      } else {
+        errorMsg = `HTTP ${response.status} Error`;
+      }
+    }
 
+    const error = new Error(errorMsg);
     error.status = response.status;
     error.data = data;
-
+    error.isNetworkError = false;
     throw error;
   }
 
@@ -147,6 +173,11 @@ export const api = {
   delete: (endpoint) =>
     request(endpoint, {
       method: 'DELETE'
+    }),
+
+  checkHealth: () =>
+    request('/health', {
+      method: 'GET'
     }),
 
   downloadCsv: async (

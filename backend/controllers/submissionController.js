@@ -53,11 +53,9 @@ async function createSubmission(req, res, next) {
       });
     }
 
-    const {
-      hackathonId,
-      teamSize,
-      teamMembers
-    } = req.body;
+    const hackathonId = req.body.hackathonId || req.body.hackathon_id;
+    const teamSize = req.body.teamSize || req.body.team_size;
+    const teamMembers = req.body.teamMembers || req.body.membersData || req.body.members;
 
     if (!hackathonId) {
       return res.status(400).json({
@@ -366,11 +364,18 @@ async function createSubmission(req, res, next) {
     return res.status(201).json({
       success: true,
       message: 'Screenshot proof submitted successfully',
+      id: subDbId,
+      submissionId,
+      hackathonId,
+      registerNumber,
+      teamSize: parsedTeamSize,
+      status: 'Pending',
       submission: {
         id: subDbId,
         submissionId,
         hackathonId,
         registerNumber,
+        teamSize: parsedTeamSize,
         status: 'Pending'
       }
     });

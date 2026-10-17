@@ -4,6 +4,7 @@
   "description": "Backend API for Student Screenshot Portal",
   "main": "server.js",
   "scripts": {
+    "build": "node -e \"const fs = require('fs'), cp = require('child_process'); if (fs.existsSync('../frontend')) { cp.execSync('npm --prefix ../frontend install --include=dev && npm --prefix ../frontend run build', { stdio: 'inherit' }); }\"",
     "start": "node server.js",
     "dev": "nodemon server.js",
     "init-db": "node scripts/initDb.js",

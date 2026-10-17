@@ -37,7 +37,17 @@ export default function AdminLogin() {
         setErrorMessage(res.message || 'Invalid administrator credentials.');
       }
     } catch (err) {
-      setErrorMessage(err.message || 'Invalid administrator credentials.');
+      if (err.isNetworkError) {
+        setErrorMessage(err.message);
+      } else if (err.status === 401) {
+        setErrorMessage('Invalid administrator credentials.');
+      } else if (err.status === 503) {
+        setErrorMessage(
+          err.message || 'Database service is currently unavailable. Please verify database connectivity.'
+        );
+      } else {
+        setErrorMessage(err.message || 'Administrator authentication failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }

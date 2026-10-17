@@ -169,18 +169,25 @@ async function getDashboardOverview(req, res, next) {
  */
 async function getSystemHealth(req, res, next) {
   try {
-    let appsScriptStatus = 'Not Configured';
+    const { getDbStatus } = require('../config/db');
+    const dbStatus = getDbStatus();
 
+    let appsScriptStatus = 'Not Configured';
     if (config.appsScriptApiUrl) {
       appsScriptStatus = 'Configured';
     }
 
     res.json({
       success: true,
-      database: 'Connected',
+      database: dbStatus.connected ? 'Connected' : 'Disconnected',
+      databaseDetails: {
+        connected: dbStatus.connected,
+        engine: dbStatus.engine,
+        error: dbStatus.error
+      },
       appsScriptStatus,
       nodeVersion: process.version,
-      uptime: process.uptime()
+      uptime: Math.round(process.uptime())
     });
 
   } catch (error) {
