@@ -1,7 +1,26 @@
 const { query, getConnection } = require('../config/db');
 const { fetchStudentFromProvider } = require('./studentController');
 const path = require('path');
+const fs = require('fs');
 const crypto = require('crypto');
+
+/**
+ * Safely delete a local file if it exists and is not a remote URL
+ */
+function safeDeleteLocalFile(filePath) {
+  if (!filePath || typeof filePath !== 'string') return;
+  if (filePath.startsWith('http://') || filePath.startsWith('https://')) return;
+  try {
+    const fullPath = path.isAbsolute(filePath)
+      ? filePath
+      : path.join(process.cwd(), filePath);
+    if (fs.existsSync(fullPath)) {
+      fs.unlinkSync(fullPath);
+    }
+  } catch (err) {
+    // Ignore cleanup errors
+  }
+}
 
 /**
  * Helper to safely extract array of rows from DB query result
@@ -107,6 +126,7 @@ async function createSubmission(req, res, next) {
           // Ignore cache insertion error
         }
       } else {
+        if (req.file?.path) safeDeleteLocalFile(req.file.path);
         return res.status(404).json({
           success: false,
           message: 'Student not found in approved list'
@@ -127,6 +147,7 @@ async function createSubmission(req, res, next) {
 
     const hackathonRows = getRows(hackathonResult);
     if (hackathonRows.length === 0) {
+      if (req.file?.path) safeDeleteLocalFile(req.file.path);
       return res.status(404).json({
         success: false,
         message: 'Hackathon not found'
@@ -139,33 +160,56 @@ async function createSubmission(req, res, next) {
       hackathon.is_active !== undefined &&
       !Number(hackathon.is_active)
     ) {
+      if (req.file?.path) safeDeleteLocalFile(req.file.path);
       return res.status(400).json({
         success: false,
         message: 'This hackathon is not active'
       });
     }
 
-    // 3. Prevent duplicate submission
+    // 3. Prevent duplicate submission unless existing submission is Rejected
     const existingResult = await query(
       `
       SELECT *
       FROM submissions
       WHERE UPPER(student_register_number) = ?
       AND hackathon_id = ?
+      ORDER BY id DESC
       LIMIT 1
       `,
       [registerNumber, hackathonId]
     );
 
     const existingRows = getRows(existingResult);
+    let existingSubmission = null;
+    let isResubmission = false;
+
     if (existingRows.length > 0) {
-      return res.status(409).json({
-        success: false,
-        message: 'You have already submitted proof for this hackathon'
-      });
+      existingSubmission = existingRows[0];
+      const currentStatus = existingSubmission.status;
+
+      if (currentStatus === 'Verified') {
+        if (req.file?.path) safeDeleteLocalFile(req.file.path);
+        return res.status(409).json({
+          success: false,
+          message: 'Your registration proof for this hackathon has already been verified and approved.'
+        });
+      }
+
+      if (currentStatus === 'Pending' || currentStatus === 'Pending Review') {
+        if (req.file?.path) safeDeleteLocalFile(req.file.path);
+        return res.status(409).json({
+          success: false,
+          message: 'You already have a registration proof submission pending review for this hackathon.'
+        });
+      }
+
+      if (currentStatus === 'Rejected') {
+        isResubmission = true;
+      }
     }
 
-    // 4. Parse team members
+    // 4. Parse team members and calculate team size counting captain exactly once
     let parsedTeamMembers = [];
 
     if (teamMembers) {
@@ -175,6 +219,7 @@ async function createSubmission(req, res, next) {
             ? JSON.parse(teamMembers)
             : teamMembers;
       } catch (error) {
+        if (req.file?.path) safeDeleteLocalFile(req.file.path);
         return res.status(400).json({
           success: false,
           message: 'Invalid team members data'
@@ -186,9 +231,42 @@ async function createSubmission(req, res, next) {
       parsedTeamMembers = [];
     }
 
-    const parsedTeamSize = Number(teamSize) || (parsedTeamMembers.length + 1) || 1;
+    // Separate captain from additional teammates and eliminate duplicate captain entries
+    const additionalMembers = [];
+    const seenRegNumbers = new Set();
+    const captainRegUpper = (registerNumber || '').toString().trim().toUpperCase();
+    if (captainRegUpper) {
+      seenRegNumbers.add(captainRegUpper);
+    }
 
-    if (parsedTeamSize < 1) {
+    for (const member of parsedTeamMembers) {
+      if (!member) continue;
+
+      const memReg = (member.registerNumber || member.register_number || '').toString().trim().toUpperCase();
+      const isCapt = Boolean(member.isCaptain || member.is_captain);
+
+      // Skip captain entry (captain is counted and inserted exactly once)
+      if (isCapt || (memReg && memReg === captainRegUpper)) {
+        continue;
+      }
+
+      // Skip duplicate entries of the same teammate
+      if (memReg && seenRegNumbers.has(memReg)) {
+        continue;
+      }
+
+      if (memReg) {
+        seenRegNumbers.add(memReg);
+      }
+
+      additionalMembers.push(member);
+    }
+
+    // Total team size: captain (counted exactly once = 1) + all distinct non-captain teammates
+    const effectiveTeamSize = 1 + additionalMembers.length;
+
+    if (effectiveTeamSize < 1) {
+      if (req.file?.path) safeDeleteLocalFile(req.file.path);
       return res.status(400).json({
         success: false,
         message: 'Team size must be at least 1'
@@ -197,8 +275,9 @@ async function createSubmission(req, res, next) {
 
     if (
       hackathon.min_team_size &&
-      parsedTeamSize < Number(hackathon.min_team_size)
+      effectiveTeamSize < Number(hackathon.min_team_size)
     ) {
+      if (req.file?.path) safeDeleteLocalFile(req.file.path);
       return res.status(400).json({
         success: false,
         message: `Minimum team size is ${hackathon.min_team_size}`
@@ -207,8 +286,9 @@ async function createSubmission(req, res, next) {
 
     if (
       hackathon.max_team_size &&
-      parsedTeamSize > Number(hackathon.max_team_size)
+      effectiveTeamSize > Number(hackathon.max_team_size)
     ) {
+      if (req.file?.path) safeDeleteLocalFile(req.file.path);
       return res.status(400).json({
         success: false,
         message: `Maximum team size is ${hackathon.max_team_size}`
@@ -219,59 +299,147 @@ async function createSubmission(req, res, next) {
     connection = await getConnection();
     await connection.beginTransaction();
 
-    const submissionId = generateSubmissionId();
-
     const screenshotPath = req.file.path
       ? (req.file.path.startsWith('http') ? req.file.path : path.relative(process.cwd(), req.file.path))
       : req.file.filename;
 
-    // Insert submission
-    const subResult = await connection.query(
-      `
-      INSERT INTO submissions (
-        submission_id,
-        student_register_number,
-        student_name,
-        student_email,
-        hackathon_id,
-        screenshot_path,
-        status
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-      `,
-      [
-        submissionId,
-        registerNumber,
-        student.name || '',
-        student.email || '',
-        hackathonId,
-        screenshotPath,
-        'Pending'
-      ]
-    );
+    let subDbId;
+    let submissionId;
+    let oldScreenshotPath = null;
+    let teamId;
 
-    const subDbId = subResult.insertId || subResult[0]?.insertId;
+    if (isResubmission && existingSubmission) {
+      subDbId = existingSubmission.id;
+      submissionId = existingSubmission.submission_id;
+      oldScreenshotPath = existingSubmission.screenshot_path;
 
-    // Insert team
-    const teamResult = await connection.query(
-      `
-      INSERT INTO teams (
-        submission_id,
-        team_size
-      )
-      VALUES (?, ?)
-      `,
-      [
-        subDbId || submissionId,
-        parsedTeamSize
-      ]
-    );
+      const histReason = existingSubmission.rejection_reason || existingSubmission.previous_rejection_reason || null;
 
-    const teamId =
-      teamResult.insertId ||
-      teamResult[0]?.insertId;
+      // Update existing submission:
+      // - Sets screenshot_path to new uploaded proof
+      // - Status resets to valid database status: 'Pending'
+      // - rejection_reason is cleared (set to NULL)
+      // - previous_rejection_reason safely preserves historical feedback if supported
+      // - updated_at refreshed to current timestamp
+      try {
+        await connection.query(
+          `
+          UPDATE submissions
+          SET screenshot_path = ?,
+              status = 'Pending',
+              rejection_reason = NULL,
+              previous_rejection_reason = ?,
+              student_name = ?,
+              student_email = ?,
+              updated_at = NOW()
+          WHERE id = ?
+          `,
+          [
+            screenshotPath,
+            histReason,
+            student.name || existingSubmission.student_name || '',
+            student.email || existingSubmission.student_email || '',
+            subDbId
+          ]
+        );
+      } catch (colErr) {
+        // Safe fallback if previous_rejection_reason column does not exist in schema
+        await connection.query(
+          `
+          UPDATE submissions
+          SET screenshot_path = ?,
+              status = 'Pending',
+              rejection_reason = NULL,
+              student_name = ?,
+              student_email = ?,
+              updated_at = NOW()
+          WHERE id = ?
+          `,
+          [
+            screenshotPath,
+            student.name || existingSubmission.student_name || '',
+            student.email || existingSubmission.student_email || '',
+            subDbId
+          ]
+        );
+      }
 
-    // Add captain/student
+      // Manage team record
+      const teamFind = await connection.query(
+        `SELECT id FROM teams WHERE submission_id = ? OR submission_id = ? LIMIT 1`,
+        [subDbId, submissionId]
+      );
+      const teamRows = getRows(teamFind);
+
+      if (teamRows.length > 0) {
+        teamId = teamRows[0].id;
+        await connection.query(
+          `UPDATE teams SET team_size = ? WHERE id = ?`,
+          [effectiveTeamSize, teamId]
+        );
+        // Delete previous team members to insert updated team composition
+        await connection.query(
+          `DELETE FROM team_members WHERE team_id = ?`,
+          [teamId]
+        );
+      } else {
+        const teamResult = await connection.query(
+          `INSERT INTO teams (submission_id, team_size) VALUES (?, ?)`,
+          [subDbId, effectiveTeamSize]
+        );
+        teamId = teamResult.insertId || teamResult[0]?.insertId;
+      }
+    } else {
+      submissionId = generateSubmissionId();
+
+      // Insert submission
+      const subResult = await connection.query(
+        `
+        INSERT INTO submissions (
+          submission_id,
+          student_register_number,
+          student_name,
+          student_email,
+          hackathon_id,
+          screenshot_path,
+          status
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [
+          submissionId,
+          registerNumber,
+          student.name || '',
+          student.email || '',
+          hackathonId,
+          screenshotPath,
+          'Pending'
+        ]
+      );
+
+      subDbId = subResult.insertId || subResult[0]?.insertId;
+
+      // Insert team
+      const teamResult = await connection.query(
+        `
+        INSERT INTO teams (
+          submission_id,
+          team_size
+        )
+        VALUES (?, ?)
+        `,
+        [
+          subDbId || submissionId,
+          effectiveTeamSize
+        ]
+      );
+
+      teamId =
+        teamResult.insertId ||
+        teamResult[0]?.insertId;
+    }
+
+    // Add captain/student (counted and registered exactly once)
     await connection.query(
       `
       INSERT INTO team_members (
@@ -303,7 +471,7 @@ async function createSubmission(req, res, next) {
     );
 
     // Add additional team members
-    for (const member of parsedTeamMembers) {
+    for (const member of additionalMembers) {
       if (!member) continue;
 
       const memberRegisterNumber = (
@@ -314,14 +482,6 @@ async function createSubmission(req, res, next) {
         .toString()
         .trim()
         .toUpperCase();
-
-      // Don't add captain twice
-      if (
-        memberRegisterNumber &&
-        memberRegisterNumber === registerNumber
-      ) {
-        continue;
-      }
 
       const memberType =
         member.memberType ||
@@ -361,22 +521,33 @@ async function createSubmission(req, res, next) {
 
     await connection.commit();
 
-    return res.status(201).json({
+    // Safe file replacement: old file is only deleted AFTER transaction successfully commits
+    if (isResubmission && oldScreenshotPath && oldScreenshotPath !== screenshotPath) {
+      safeDeleteLocalFile(oldScreenshotPath);
+    }
+
+    const returnStatus = 'Pending';
+
+    return res.status(isResubmission ? 200 : 201).json({
       success: true,
-      message: 'Screenshot proof submitted successfully',
+      message: isResubmission
+        ? 'Corrected registration proof resubmitted successfully'
+        : 'Screenshot proof submitted successfully',
       id: subDbId,
       submissionId,
-      hackathonId,
+      hackathonId: Number(hackathonId),
       registerNumber,
-      teamSize: parsedTeamSize,
-      status: 'Pending',
+      teamSize: effectiveTeamSize,
+      status: returnStatus,
+      isResubmission,
       submission: {
         id: subDbId,
         submissionId,
-        hackathonId,
+        hackathonId: Number(hackathonId),
         registerNumber,
-        teamSize: parsedTeamSize,
-        status: 'Pending'
+        teamSize: effectiveTeamSize,
+        status: returnStatus,
+        isResubmission
       }
     });
 
@@ -387,6 +558,11 @@ async function createSubmission(req, res, next) {
       } catch (rollbackError) {
         console.error('Rollback error:', rollbackError);
       }
+    }
+
+    // Cleanup newly uploaded file on error so orphaned files are not retained
+    if (req.file?.path) {
+      safeDeleteLocalFile(req.file.path);
     }
 
     console.error('Create submission error:', error);
@@ -428,12 +604,16 @@ async function getMySubmissions(req, res, next) {
       SELECT
         s.*,
         h.name AS hackathon_name,
+        h.institution AS hackathon_institution,
         h.institution,
         h.start_date,
-        h.end_date
+        h.end_date,
+        COALESCE(t.team_size, 1) AS team_size
       FROM submissions s
       LEFT JOIN hackathons h
         ON h.id = s.hackathon_id
+      LEFT JOIN teams t
+        ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
       WHERE UPPER(s.student_register_number) = ?
       ORDER BY s.created_at DESC
       `,
@@ -476,14 +656,18 @@ async function getSubmissionById(req, res, next) {
       SELECT
         s.*,
         h.name AS hackathon_name,
+        h.institution AS hackathon_institution,
         h.institution,
         h.description,
         h.start_date,
         h.end_date,
-        h.registration_url
+        h.registration_url,
+        COALESCE(t.team_size, 1) AS team_size
       FROM submissions s
       LEFT JOIN hackathons h
         ON h.id = s.hackathon_id
+      LEFT JOIN teams t
+        ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
       WHERE s.id = ?
          OR s.submission_id = ?
       LIMIT 1
@@ -500,9 +684,32 @@ async function getSubmissionById(req, res, next) {
       });
     }
 
+    const submission = rows[0];
+
+    // Fetch team members for detailed review
+    const teamResult = await query(
+      `
+      SELECT
+        tm.*,
+        t.team_size
+      FROM team_members tm
+      INNER JOIN teams t
+        ON t.id = tm.team_id
+      WHERE t.submission_id = ?
+         OR t.submission_id = ?
+      ORDER BY tm.is_captain DESC, tm.id ASC
+      `,
+      [submission.id, submission.submission_id]
+    );
+
+    submission.team_members = getRows(teamResult);
+    if (submission.team_members.length > 0) {
+      submission.team_size = submission.team_members[0].team_size || submission.team_members.length;
+    }
+
     return res.json({
       success: true,
-      submission: rows[0]
+      submission
     });
 
   } catch (error) {
@@ -528,10 +735,13 @@ async function getAllSubmissionsAdmin(req, res, next) {
         h.name AS hackathon_name,
         h.institution,
         h.start_date,
-        h.end_date
+        h.end_date,
+        COALESCE(t.team_size, 1) AS team_size
       FROM submissions s
       LEFT JOIN hackathons h
         ON h.id = s.hackathon_id
+      LEFT JOIN teams t
+        ON (t.submission_id = s.id OR t.submission_id = s.submission_id)
       WHERE 1=1
     `;
     const params = [];
@@ -542,8 +752,12 @@ async function getAllSubmissionsAdmin(req, res, next) {
     }
 
     if (status && status !== 'All') {
-      sql += ` AND s.status = ?`;
-      params.push(status);
+      if (status === 'Pending') {
+        sql += ` AND s.status IN ('Pending', 'Pending Review')`;
+      } else {
+        sql += ` AND s.status = ?`;
+        params.push(status);
+      }
     }
 
     if (search && search.trim()) {
@@ -621,10 +835,15 @@ async function rejectSubmission(req, res, next) {
   try {
     const { id } = req.params;
 
-    const rejectionReason =
-      req.body?.rejectionReason ||
-      req.body?.rejection_reason ||
-      'Registration proof was rejected';
+    const rawReason = req.body?.rejectionReason || req.body?.rejection_reason;
+    if (!rawReason || !rawReason.trim()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Rejection reason is mandatory when rejecting a submission'
+      });
+    }
+
+    const rejectionReason = rawReason.trim();
 
     await query(
       `
@@ -762,8 +981,12 @@ async function getAllTeamsAdmin(req, res, next) {
     }
 
     if (status && status !== 'All') {
-      sql += ` AND s.status = ?`;
-      params.push(status);
+      if (status === 'Pending') {
+        sql += ` AND s.status IN ('Pending', 'Pending Review')`;
+      } else {
+        sql += ` AND s.status = ?`;
+        params.push(status);
+      }
     }
 
     if (search && search.trim()) {
@@ -812,7 +1035,7 @@ async function getSubmissionStats(req, res, next) {
     const statsResult = await query(`
       SELECT
         COUNT(id) AS total,
-        COUNT(CASE WHEN status = 'Pending' THEN 1 END) AS pending,
+        COUNT(CASE WHEN status IN ('Pending', 'Pending Review') THEN 1 END) AS pending,
         COUNT(CASE WHEN status = 'Verified' THEN 1 END) AS verified,
         COUNT(CASE WHEN status = 'Rejected' THEN 1 END) AS rejected
       FROM submissions

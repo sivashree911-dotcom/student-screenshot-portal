@@ -47,6 +47,18 @@ export default function MySubmissions() {
     return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
+  const handleOpenModal = async (sub) => {
+    setSelectedSub(sub);
+    try {
+      const res = await api.get(`/submissions/${sub.id}`);
+      if (res.success && res.submission) {
+        setSelectedSub(res.submission);
+      }
+    } catch (e) {
+      // keep basic info
+    }
+  };
+
   const getStatusBadge = (status) => {
     switch (status) {
       case 'Verified':
@@ -59,6 +71,12 @@ export default function MySubmissions() {
         return (
           <span className="badge badge-rejected">
             <XCircle size={13} /> Rejected
+          </span>
+        );
+      case 'Pending Review':
+        return (
+          <span className="badge badge-pending">
+            <Clock size={13} /> Pending Review
           </span>
         );
       default:
@@ -136,14 +154,25 @@ export default function MySubmissions() {
                       </div>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setSelectedSub(sub)}
-                      className="btn btn-secondary btn-sm"
-                    >
-                      <Eye size={15} />
-                      <span>View Details</span>
-                    </button>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {sub.status === 'Rejected' && (
+                        <Link
+                          to={`/hackathons/${sub.hackathon_id}`}
+                          className="btn btn-primary btn-sm"
+                        >
+                          <Layers size={14} />
+                          <span>Resubmit Proof</span>
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleOpenModal(sub)}
+                        className="btn btn-secondary btn-sm"
+                      >
+                        <Eye size={15} />
+                        <span>View Details</span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* If Rejected: Show reason box */}
@@ -163,6 +192,28 @@ export default function MySubmissions() {
                         <span>Reason for Rejection:</span>
                       </div>
                       <div style={{ color: '#fecaca' }}>{sub.rejection_reason}</div>
+                    </div>
+                  )}
+
+                  {/* If Pending Review after rejection: Show notice */}
+                  {sub.status === 'Pending Review' && sub.previous_rejection_reason && (
+                    <div
+                      style={{
+                        marginTop: '1.25rem',
+                        background: 'rgba(245, 158, 11, 0.08)',
+                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '0.85rem 1.1rem',
+                        fontSize: '0.88rem'
+                      }}
+                    >
+                      <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                        <Clock size={15} />
+                        <span>Corrected Submission Under Review</span>
+                      </div>
+                      <div style={{ color: 'var(--text-secondary)' }}>
+                        You resubmitted this proof following the administrator feedback: <em>"{sub.previous_rejection_reason}"</em>. Awaiting verification.
+                      </div>
                     </div>
                   )}
 
@@ -211,6 +262,27 @@ export default function MySubmissions() {
                 <AlertCircle size={18} />
                 <div>
                   <strong>Rejection Reason:</strong> {selectedSub.rejection_reason}
+                </div>
+              </div>
+            )}
+
+            {selectedSub.previous_rejection_reason && (selectedSub.status === 'Pending Review' || selectedSub.status === 'Pending') && (
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem 1.1rem',
+                  fontSize: '0.88rem'
+                }}
+              >
+                <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Clock size={15} />
+                  <span>Corrected Resubmission Under Review</span>
+                </div>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  Prior rejection feedback: <span style={{ color: '#ffffff' }}>"{selectedSub.previous_rejection_reason}"</span>
                 </div>
               </div>
             )}
@@ -296,6 +368,19 @@ export default function MySubmissions() {
                     style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain' }}
                   />
                 </div>
+              </div>
+            )}
+
+            {/* If Rejected: Action button to resubmit */}
+            {selectedSub.status === 'Rejected' && (
+              <div style={{ marginTop: '1.5rem', paddingTop: '1.25rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'flex-end' }}>
+                <Link
+                  to={`/hackathons/${selectedSub.hackathon_id}`}
+                  className="btn btn-primary"
+                >
+                  <Layers size={16} />
+                  <span>Resubmit Corrected Proof</span>
+                </Link>
               </div>
             )}
           </div>

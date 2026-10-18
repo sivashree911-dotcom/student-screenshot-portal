@@ -24,7 +24,7 @@ async function getDashboardOverview(req, res, next) {
     const submissionStatsRows = await query(`
       SELECT
         COUNT(id) AS total_submissions,
-        COUNT(CASE WHEN status = 'Pending' THEN 1 END) AS pending_submissions,
+        COUNT(CASE WHEN status IN ('Pending', 'Pending Review') THEN 1 END) AS pending_submissions,
         COUNT(CASE WHEN status = 'Verified' THEN 1 END) AS verified_submissions,
         COUNT(CASE WHEN status = 'Rejected' THEN 1 END) AS rejected_submissions
       FROM submissions
@@ -99,7 +99,7 @@ async function getDashboardOverview(req, res, next) {
           hackathon_id,
           COUNT(id) AS total_submissions,
           COUNT(CASE WHEN status = 'Verified' THEN 1 END) AS verified_submissions,
-          COUNT(CASE WHEN status = 'Pending' THEN 1 END) AS pending_submissions,
+          COUNT(CASE WHEN status IN ('Pending', 'Pending Review') THEN 1 END) AS pending_submissions,
           COUNT(CASE WHEN status = 'Rejected' THEN 1 END) AS rejected_submissions
         FROM submissions
         GROUP BY hackathon_id

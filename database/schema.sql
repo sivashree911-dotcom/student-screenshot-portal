@@ -68,6 +68,7 @@ CREATE TABLE IF NOT EXISTS `submissions` (
   `screenshot_path` VARCHAR(500) NOT NULL,
   `status` ENUM('Pending', 'Verified', 'Rejected') NOT NULL DEFAULT 'Pending',
   `rejection_reason` TEXT NULL,
+  `previous_rejection_reason` TEXT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   FOREIGN KEY (`hackathon_id`) REFERENCES `hackathons`(`id`) ON DELETE CASCADE,

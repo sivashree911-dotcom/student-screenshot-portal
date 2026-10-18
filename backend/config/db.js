@@ -461,6 +461,7 @@ async function initDatabase() {
           screenshot_path VARCHAR(500) NOT NULL,
           status ENUM('Pending', 'Verified', 'Rejected') NOT NULL DEFAULT 'Pending',
           rejection_reason TEXT NULL,
+          previous_rejection_reason TEXT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
           INDEX idx_sub_student_reg (student_register_number),
@@ -546,6 +547,10 @@ async function initDatabase() {
         await mysqlPool.query('ALTER TABLE submissions ADD COLUMN rejection_reason TEXT NULL');
       } catch (e) {}
 
+      try {
+        await mysqlPool.query('ALTER TABLE submissions ADD COLUMN previous_rejection_reason TEXT NULL');
+      } catch (e) {}
+
     } catch (schemaErr) {
       console.error('❌ [DB] Error during MySQL schema verification:', schemaErr.message);
     }
@@ -618,11 +623,16 @@ async function initDatabase() {
         screenshot_path TEXT NOT NULL,
         status TEXT NOT NULL DEFAULT 'Pending',
         rejection_reason TEXT,
+        previous_rejection_reason TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (hackathon_id) REFERENCES hackathons(id) ON DELETE CASCADE
       );
     `);
+
+    try {
+      await sqliteRun('ALTER TABLE submissions ADD COLUMN previous_rejection_reason TEXT');
+    } catch (e) {}
 
     // 5. Teams
     await sqliteRun(`

@@ -81,35 +81,42 @@ router.put(
 // 3. SINGLE SUBMISSION BY ID (Wildcard Route - Placed Last)
 // =====================================================
 
+const jwt = require('jsonwebtoken');
+const config = require('../config/config');
+
 router.get(
   '/:id',
   (req, res, next) => {
-    const auth = req.headers.authorization;
+    const authHeader = req.headers.authorization;
 
-    if (!auth) {
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({
         success: false,
         message: 'Authentication required to view submission details.'
       });
     }
 
-    // Try student auth first, then fallback to admin auth
-    verifyStudentToken(req, res, (studentError) => {
-      if (!studentError) {
+    const token = authHeader.split(' ')[1];
+    try {
+      const decoded = jwt.verify(token, config.jwt.secret);
+      if (decoded.role === 'admin') {
+        req.admin = decoded;
         return submissionController.getSubmissionById(req, res, next);
-      }
-
-      verifyAdminToken(req, res, (adminError) => {
-        if (!adminError) {
-          return submissionController.getSubmissionById(req, res, next);
-        }
-
-        return res.status(401).json({
+      } else if (decoded.role === 'student' && decoded.registerNumber) {
+        req.student = decoded;
+        return submissionController.getSubmissionById(req, res, next);
+      } else {
+        return res.status(403).json({
           success: false,
-          message: 'Invalid authentication credentials.'
+          message: 'Forbidden. Valid student or administrator credentials required.'
         });
+      }
+    } catch (err) {
+      return res.status(401).json({
+        success: false,
+        message: 'Invalid or expired session token.'
       });
-    });
+    }
   }
 );
 

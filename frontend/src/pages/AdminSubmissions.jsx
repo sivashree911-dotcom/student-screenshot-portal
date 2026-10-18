@@ -152,7 +152,7 @@ export default function AdminSubmissions() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option value="All">All Statuses</option>
-              <option value="Pending">Pending</option>
+              <option value="Pending">Pending / Pending Review</option>
               <option value="Verified">Verified</option>
               <option value="Rejected">Rejected</option>
             </select>
@@ -279,6 +279,28 @@ export default function AdminSubmissions() {
                 <AlertCircle size={18} />
                 <div>
                   <strong>Rejection Reason:</strong> {selectedSub.rejection_reason}
+                </div>
+              </div>
+            )}
+
+            {/* Prior Rejection Notice if resubmitted */}
+            {selectedSub.previous_rejection_reason && (selectedSub.status === 'Pending Review' || selectedSub.status === 'Pending') && (
+              <div
+                style={{
+                  marginBottom: '1.25rem',
+                  background: 'rgba(245, 158, 11, 0.08)',
+                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.85rem 1.1rem',
+                  fontSize: '0.88rem'
+                }}
+              >
+                <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Clock size={15} />
+                  <span>Corrected Resubmission (Previously Rejected)</span>
+                </div>
+                <div style={{ color: 'var(--text-secondary)' }}>
+                  Prior rejection feedback: <span style={{ color: '#ffffff' }}>"{selectedSub.previous_rejection_reason}"</span>
                 </div>
               </div>
             )}

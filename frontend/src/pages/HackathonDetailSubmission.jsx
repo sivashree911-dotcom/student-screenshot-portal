@@ -34,6 +34,9 @@ export default function HackathonDetailSubmission() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Existing Student Submission (for resubmission or status lock)
+  const [existingSubmission, setExistingSubmission] = useState(null);
+
   // Flow State
   const [hasCompletedExternalReg, setHasCompletedExternalReg] = useState(false);
   const [screenshotFile, setScreenshotFile] = useState(null);
@@ -89,6 +92,53 @@ export default function HackathonDetailSubmission() {
           }
 
           setMembers(initialMembers);
+
+          // Check if the student has an existing submission for this hackathon
+          try {
+            const subRes = await api.get('/submissions/my');
+            if (subRes.success && Array.isArray(subRes.submissions)) {
+              const foundSub = subRes.submissions.find(
+                (s) => String(s.hackathon_id) === String(id)
+              );
+
+              if (foundSub) {
+                setExistingSubmission(foundSub);
+
+                // If rejected, allow resubmission and pre-populate previous team details
+                if (foundSub.status === 'Rejected') {
+                  setHasCompletedExternalReg(true);
+
+                  try {
+                    const detailRes = await api.get(`/submissions/${foundSub.id}`);
+                    if (
+                      detailRes.success &&
+                      detailRes.submission &&
+                      Array.isArray(detailRes.submission.team_members) &&
+                      detailRes.submission.team_members.length > 0
+                    ) {
+                      const prevMembers = detailRes.submission.team_members.map((m) => ({
+                        registerNumber: m.register_number || '',
+                        name: m.name || '',
+                        department: m.department || '',
+                        year: m.year || '',
+                        section: m.section || '',
+                        memberType: m.member_type || 'College',
+                        institution: m.institution || 'College',
+                        email: m.email || '',
+                        isCaptain: Boolean(m.is_captain)
+                      }));
+                      setTeamSize(prevMembers.length);
+                      setMembers(prevMembers);
+                    }
+                  } catch (e) {
+                    // Ignore team detail fetch error
+                  }
+                }
+              }
+            }
+          } catch (e) {
+            // Ignore my submissions fetch error
+          }
         } else {
           setError('Hackathon not found.');
         }
@@ -226,6 +276,23 @@ export default function HackathonDetailSubmission() {
       return;
     }
 
+    // Validate team size (counting captain exactly once)
+    const captainRegUpper = (student?.registerNumber || '').toString().trim().toUpperCase();
+    const additionalMembers = members.filter(
+      (m, idx) => idx !== 0 && !m.isCaptain && (!m.registerNumber || m.registerNumber.toString().trim().toUpperCase() !== captainRegUpper)
+    );
+    const effectiveTeamSize = 1 + additionalMembers.length;
+
+    if (hackathon?.min_team_size && effectiveTeamSize < Number(hackathon.min_team_size)) {
+      setError(`Minimum team size is ${hackathon.min_team_size}`);
+      return;
+    }
+
+    if (hackathon?.max_team_size && effectiveTeamSize > Number(hackathon.max_team_size)) {
+      setError(`Maximum team size is ${hackathon.max_team_size}`);
+      return;
+    }
+
     // Validate college members
     for (let i = 1; i < members.length; i++) {
       const m = members[i];
@@ -247,13 +314,18 @@ export default function HackathonDetailSubmission() {
     try {
       const formData = new FormData();
       formData.append('hackathonId', id);
+      formData.append('teamSize', String(effectiveTeamSize));
       formData.append('screenshot', screenshotFile);
       formData.append('membersData', JSON.stringify(members));
 
       const res = await api.post('/submissions', formData);
 
       if (res.success) {
-        setSubmissionSuccess(res);
+        setSubmissionSuccess({
+          ...res,
+          isResubmission: Boolean(existingSubmission && existingSubmission.status === 'Rejected')
+        });
+        setExistingSubmission(res.submission || res);
         // Trigger celebratory confetti
         try {
           confetti({
@@ -334,10 +406,12 @@ export default function HackathonDetailSubmission() {
               </div>
 
               <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
-                Registration Submitted Successfully
+                {submissionSuccess.isResubmission ? 'Registration Resubmitted Successfully' : 'Registration Submitted Successfully'}
               </h1>
               <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', marginBottom: '2rem' }}>
-                Your registration proof has been submitted successfully and sent for administrative verification.
+                {submissionSuccess.isResubmission
+                  ? 'Your corrected registration proof has been submitted successfully and sent for administrative review.'
+                  : 'Your registration proof has been submitted successfully and sent for administrative verification.'}
               </p>
 
               {/* Submission Details Box */}
@@ -368,7 +442,7 @@ export default function HackathonDetailSubmission() {
                     </div>
                     <div style={{ marginTop: '0.25rem' }}>
                       <span className="badge badge-pending">
-                        {submissionSuccess.status || 'Pending Verification'}
+                        {submissionSuccess.status || 'Pending Review'}
                       </span>
                     </div>
                   </div>
@@ -518,320 +592,449 @@ export default function HackathonDetailSubmission() {
                 </div>
               </div>
 
-              {/* Step 2 & 3: Proof Upload & Team Details */}
-              {hasCompletedExternalReg && (
-                <form onSubmit={handleSubmitProof}>
-                  {/* Proof Upload Card */}
-                  <div className="card" style={{ marginBottom: '2rem' }}>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.35rem' }}>
-                      Upload Registration Proof
-                    </h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                      Upload a screenshot showing that you have successfully registered for this hackathon.
-                    </p>
-
-                    <FileUpload
-                      file={screenshotFile}
-                      onFileSelect={(file) => setScreenshotFile(file)}
-                      onFileRemove={() => setScreenshotFile(null)}
-                      label="Registration Confirmation Screenshot"
-                    />
+              {/* If existing submission is already Verified or Pending: show locked status and disallow resubmission */}
+              {existingSubmission && existingSubmission.status !== 'Rejected' ? (
+                <div className="card" style={{ padding: '2.5rem 2rem', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      borderRadius: '50%',
+                      background:
+                        existingSubmission.status === 'Verified'
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : 'rgba(245, 158, 11, 0.15)',
+                      color:
+                        existingSubmission.status === 'Verified'
+                          ? 'var(--accent-emerald)'
+                          : 'var(--accent-amber)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: '0 auto 1.25rem'
+                    }}
+                  >
+                    {existingSubmission.status === 'Verified' ? (
+                      <CheckCircle2 size={36} />
+                    ) : (
+                      <Clock size={36} />
+                    )}
                   </div>
 
-                  {/* Team Details Card */}
-                  <div className="card" style={{ marginBottom: '2rem' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
-                      <div>
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.25rem' }}>
-                          Team Details
-                        </h2>
-                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
-                          Configure your team composition ({hackathon.min_team_size} to {hackathon.max_team_size} members).
-                        </p>
-                      </div>
+                  <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem', color: '#ffffff' }}>
+                    {existingSubmission.status === 'Verified'
+                      ? 'Registration Proof Verified & Approved'
+                      : 'Registration Proof Under Review'}
+                  </h2>
 
-                      {/* Team Size Selector */}
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                        <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
-                          Team Size:
-                        </label>
-                        <select
-                          className="form-select"
-                          value={teamSize}
-                          onChange={(e) => handleTeamSizeChange(parseInt(e.target.value, 10))}
-                          style={{ width: 'auto', padding: '0.45rem 1rem', fontWeight: 700 }}
-                        >
-                          {Array.from(
-                            { length: hackathon.max_team_size - hackathon.min_team_size + 1 },
-                            (_, i) => hackathon.min_team_size + i
-                          ).map((num) => (
-                            <option key={num} value={num}>
-                              {num} Members
-                            </option>
-                          ))}
-                        </select>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', maxWidth: '580px', margin: '0 auto 1.75rem', lineHeight: 1.5 }}>
+                    {existingSubmission.status === 'Verified'
+                      ? 'Your registration proof for this hackathon has already been reviewed and verified by college administrators. No further action or resubmission is required.'
+                      : 'You have already submitted registration proof for this hackathon. It is currently pending administrative review. Resubmission is only permitted if an administrator requests changes or rejects the proof.'}
+                  </p>
+
+                  <div
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '1.25rem',
+                      maxWidth: '420px',
+                      margin: '0 auto 2rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center'
+                    }}
+                  >
+                    <div style={{ textAlign: 'left' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                        Submission ID
+                      </div>
+                      <div className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-400)', fontSize: '1.1rem' }}>
+                        {existingSubmission.submission_id}
                       </div>
                     </div>
 
-                    {/* Member List */}
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-                      {members.map((member, idx) => {
-                        const isCaptain = idx === 0;
-                        const lookup = memberLookups[idx];
-
-                        return (
-                          <div
-                            key={idx}
-                            style={{
-                              background: isCaptain ? 'rgba(99, 102, 241, 0.08)' : 'rgba(15, 23, 42, 0.6)',
-                              border: `1px solid ${isCaptain ? 'rgba(99, 102, 241, 0.3)' : 'var(--border-subtle)'}`,
-                              borderRadius: 'var(--radius-lg)',
-                              padding: '1.25rem'
-                            }}
-                          >
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
-                                  Member {idx + 1}
-                                </span>
-                                {isCaptain ? (
-                                  <span className="badge badge-college">
-                                    ★ Team Captain
-                                  </span>
-                                ) : (
-                                  <span className={`badge ${member.memberType === 'External' ? 'badge-external' : 'badge-college'}`}>
-                                    {member.memberType === 'External' ? 'External Participant' : 'College Student'}
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Toggle College / External Member if allowed and not captain */}
-                              {!isCaptain && hackathon.allow_external_participants && (
-                                <div style={{ display: 'flex', gap: '0.35rem' }}>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleMemberType(idx, 'College')}
-                                    className={`btn btn-sm ${member.memberType === 'College' ? 'btn-primary' : 'btn-secondary'}`}
-                                    style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
-                                  >
-                                    College Student
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleToggleMemberType(idx, 'External')}
-                                    className={`btn btn-sm ${member.memberType === 'External' ? 'btn-primary' : 'btn-secondary'}`}
-                                    style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
-                                  >
-                                    External Member
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-
-                            {/* Captain Row (Read-only) */}
-                            {isCaptain ? (
-                              <div
-                                style={{
-                                  display: 'grid',
-                                  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-                                  gap: '0.75rem',
-                                  fontSize: '0.88rem'
-                                }}
-                              >
-                                <div>
-                                  <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>REGISTER NUMBER</span>
-                                  <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{student.registerNumber}</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STUDENT NAME</span>
-                                  <strong style={{ color: 'var(--text-primary)' }}>{student.name}</strong>
-                                </div>
-                                <div>
-                                  <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>DEPARTMENT / YEAR</span>
-                                  <span>{student.department} (Year {student.year})</span>
-                                </div>
-                                <div>
-                                  <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STATUS</span>
-                                  <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                    <CheckCircle2 size={14} /> Verified Captain
-                                  </span>
-                                </div>
-                              </div>
-                            ) : member.memberType === 'College' ? (
-                              /* College Member Form */
-                              <div>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '1rem', alignItems: 'flex-start' }}>
-                                  <div className="form-group" style={{ margin: 0 }}>
-                                    <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                                      Register Number <span style={{ color: 'var(--accent-rose)' }}>*</span>
-                                    </label>
-                                    <input
-                                      type="text"
-                                      className="form-input"
-                                      placeholder="e.g. 1301"
-                                      value={member.registerNumber}
-                                      onChange={(e) => handleMemberRegChange(idx, e.target.value)}
-                                      style={{ padding: '0.6rem 0.85rem' }}
-                                    />
-                                  </div>
-
-                                  {/* Live Verification Badge / Info */}
-                                  <div>
-                                    {lookup?.loading ? (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-400)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
-                                        <Loader2 size={16} className="animate-spin" />
-                                        <span>Verifying register number...</span>
-                                      </div>
-                                    ) : lookup?.data || member.name ? (
-                                      <div
-                                        style={{
-                                          background: 'rgba(16, 185, 129, 0.08)',
-                                          border: '1px solid rgba(16, 185, 129, 0.3)',
-                                          borderRadius: 'var(--radius-md)',
-                                          padding: '0.65rem 1rem',
-                                          marginTop: '0.25rem'
-                                        }}
-                                      >
-                                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
-                                          <CheckCircle2 size={15} />
-                                          <span>Verified College Student</span>
-                                        </div>
-                                        <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
-                                          <strong>{member.name}</strong> • {member.department} (Year {member.year})
-                                        </div>
-                                      </div>
-                                    ) : lookup?.error ? (
-                                      <div className="error-text" style={{ paddingTop: '1.75rem' }}>
-                                        <AlertCircle size={15} />
-                                        <span>{lookup.error}</span>
-                                      </div>
-                                    ) : (
-                                      <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', paddingTop: '1.75rem' }}>
-                                        Enter register number to auto-verify approved student
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              /* External Member Form */
-                              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                                    Full Name <span style={{ color: 'var(--accent-rose)' }}>*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="External student full name"
-                                    value={member.name}
-                                    onChange={(e) => handleExternalFieldChange(idx, 'name', e.target.value)}
-                                    style={{ padding: '0.6rem 0.85rem' }}
-                                  />
-                                </div>
-
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                                    Institution / College <span style={{ color: 'var(--accent-rose)' }}>*</span>
-                                  </label>
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="e.g. ABC Engineering College"
-                                    value={member.institution}
-                                    onChange={(e) => handleExternalFieldChange(idx, 'institution', e.target.value)}
-                                    style={{ padding: '0.6rem 0.85rem' }}
-                                  />
-                                </div>
-
-                                <div className="form-group" style={{ margin: 0 }}>
-                                  <label className="form-label" style={{ fontSize: '0.82rem' }}>
-                                    Student ID / Reg No (optional)
-                                  </label>
-                                  <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="External ID"
-                                    value={member.registerNumber}
-                                    onChange={(e) => handleExternalFieldChange(idx, 'registerNumber', e.target.value)}
-                                    style={{ padding: '0.6rem 0.85rem' }}
-                                  />
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
+                    <div>
+                      <span className={`badge ${existingSubmission.status === 'Verified' ? 'badge-verified' : 'badge-pending'}`}>
+                        {existingSubmission.status === 'Verified' ? 'Verified' : existingSubmission.status === 'Pending Review' ? 'Pending Review' : 'Pending Verification'}
+                      </span>
                     </div>
                   </div>
 
-                  {/* Submission Summary Box */}
-                  <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--primary-500)' }}>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Sparkles size={18} color="var(--primary-400)" />
-                      <span>Submission Summary</span>
-                    </h3>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-                      <div>
-                        <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>HACKATHON</span>
-                        <strong>{hackathon.name}</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SUBMITTING CAPTAIN</span>
-                        <strong>{student.name} ({student.registerNumber})</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>TOTAL TEAM SIZE</span>
-                        <strong>{teamSize} Members</strong>
-                      </div>
-                      <div>
-                        <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SCREENSHOT ATTACHED</span>
-                        <span style={{ color: screenshotFile ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 600 }}>
-                          {screenshotFile ? `✓ ${screenshotFile.name}` : '❌ Not Uploaded'}
+                  <div style={{ display: 'flex', justifyContent: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <Link to="/my-submissions" className="btn btn-primary">
+                      <FileCheck2 size={16} />
+                      <span>View in My Submissions</span>
+                    </Link>
+                    <Link to="/hackathons" className="btn btn-secondary">
+                      <span>Browse Available Hackathons</span>
+                    </Link>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* If Rejected: Show Rejection Action Banner */}
+                  {existingSubmission && existingSubmission.status === 'Rejected' && (
+                    <div
+                      style={{
+                        marginBottom: '2rem',
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        borderRadius: 'var(--radius-lg)',
+                        padding: '1.5rem'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', color: 'var(--accent-rose)', fontWeight: 800, fontSize: '1.15rem', marginBottom: '0.5rem' }}>
+                        <AlertCircle size={22} />
+                        <span>Previous Submission Rejected — Action Required</span>
+                        <span className="badge badge-rejected" style={{ marginLeft: 'auto' }}>
+                          Resubmission Enabled
                         </span>
                       </div>
-                    </div>
-
-                    <div style={{ background: 'rgba(15, 23, 42, 0.7)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.1rem', fontSize: '0.85rem' }}>
-                      <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Team Members List:</div>
-                      <ol style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
-                        {members.map((m, i) => (
-                          <li key={i}>
-                            <strong>{m.registerNumber || '(Ext)'}</strong> - {m.name || 'Pending Entry'} {m.institution && m.institution !== 'College' ? `(${m.institution})` : ''} - <span style={{ color: m.isCaptain ? 'var(--primary-400)' : m.memberType === 'External' ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>{m.isCaptain ? 'Team Captain' : m.memberType === 'External' ? 'External Participant' : 'College Student'}</span>
-                          </li>
-                        ))}
-                      </ol>
-                    </div>
-                  </div>
-
-                  {error && (
-                    <div className="alert alert-danger" style={{ marginBottom: '1.5rem' }}>
-                      <AlertCircle size={20} />
-                      <div>{error}</div>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem', marginBottom: '1rem', lineHeight: 1.5 }}>
+                        Your previous registration proof was rejected by the administrator. Please review the feedback below and upload a corrected registration proof.
+                      </p>
+                      <div
+                        style={{
+                          background: 'rgba(15, 23, 42, 0.8)',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '0.85rem 1.15rem',
+                          borderLeft: '4px solid var(--accent-rose)',
+                          marginBottom: '0.75rem'
+                        }}
+                      >
+                        <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-rose)', fontWeight: 700, marginBottom: '0.25rem' }}>
+                          Reason for Rejection:
+                        </div>
+                        <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>
+                          {existingSubmission.rejection_reason || 'Registration proof was rejected.'}
+                        </div>
+                      </div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)' }}>
+                        Upload your corrected proof below, adjust team details if necessary, and submit to update your submission to <strong>Pending Review</strong>.
+                      </div>
                     </div>
                   )}
 
-                  {/* Submit Proof Button */}
-                  <button
-                    type="submit"
-                    className="btn btn-primary btn-lg btn-block"
-                    disabled={submitting || !screenshotFile}
-                    style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
-                  >
-                    {submitting ? (
-                      <>
-                        <Loader2 size={20} className="animate-spin" />
-                        <span>Submitting Registration Proof...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>SUBMIT REGISTRATION PROOF</span>
-                        <ArrowRight size={20} />
-                      </>
-                    )}
-                  </button>
-                </form>
+                  {/* Step 2 & 3: Proof Upload & Team Details */}
+                  {hasCompletedExternalReg && (
+                    <form onSubmit={handleSubmitProof}>
+                      {/* Proof Upload Card */}
+                      <div className="card" style={{ marginBottom: '2rem' }}>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.35rem' }}>
+                          {existingSubmission && existingSubmission.status === 'Rejected' ? 'Upload Corrected Registration Proof' : 'Upload Registration Proof'}
+                        </h2>
+                        <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+                          {existingSubmission && existingSubmission.status === 'Rejected'
+                            ? 'Upload a corrected screenshot addressing the administrator rejection feedback.'
+                            : 'Upload a screenshot showing that you have successfully registered for this hackathon.'}
+                        </p>
+
+                        <FileUpload
+                          file={screenshotFile}
+                          onFileSelect={(file) => setScreenshotFile(file)}
+                          onFileRemove={() => setScreenshotFile(null)}
+                          label="Registration Confirmation Screenshot"
+                        />
+                      </div>
+
+                      {/* Team Details Card */}
+                      <div className="card" style={{ marginBottom: '2rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
+                          <div>
+                            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.25rem' }}>
+                              Team Details
+                            </h2>
+                            <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
+                              Configure your team composition ({hackathon.min_team_size} to {hackathon.max_team_size} members).
+                            </p>
+                          </div>
+
+                          {/* Team Size Selector */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                            <label className="form-label" style={{ margin: 0, fontWeight: 700 }}>
+                              Team Size:
+                            </label>
+                            <select
+                              className="form-select"
+                              value={teamSize}
+                              onChange={(e) => handleTeamSizeChange(parseInt(e.target.value, 10))}
+                              style={{ width: 'auto', padding: '0.45rem 1rem', fontWeight: 700 }}
+                            >
+                              {Array.from(
+                                { length: Math.max(1, (hackathon.max_team_size || 1) - (hackathon.min_team_size || 1) + 1) },
+                                (_, i) => (hackathon.min_team_size || 1) + i
+                              ).map((num) => (
+                                <option key={num} value={num}>
+                                  {num} Members
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Member List */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                          {members.map((member, idx) => {
+                            const isCaptain = idx === 0;
+                            const lookup = memberLookups[idx];
+
+                            return (
+                              <div
+                                key={idx}
+                                style={{
+                                  background: isCaptain ? 'rgba(99, 102, 241, 0.08)' : 'rgba(15, 23, 42, 0.6)',
+                                  border: `1px solid ${isCaptain ? 'rgba(99, 102, 241, 0.3)' : 'var(--border-subtle)'}`,
+                                  borderRadius: 'var(--radius-lg)',
+                                  padding: '1.25rem'
+                                }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
+                                      Member {idx + 1}
+                                    </span>
+                                    {isCaptain ? (
+                                      <span className="badge badge-college">
+                                        ★ Team Captain
+                                      </span>
+                                    ) : (
+                                      <span className={`badge ${member.memberType === 'External' ? 'badge-external' : 'badge-college'}`}>
+                                        {member.memberType === 'External' ? 'External Participant' : 'College Student'}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {/* Toggle College / External Member if allowed and not captain */}
+                                  {!isCaptain && hackathon.allow_external_participants && (
+                                    <div style={{ display: 'flex', gap: '0.35rem' }}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleMemberType(idx, 'College')}
+                                        className={`btn btn-sm ${member.memberType === 'College' ? 'btn-primary' : 'btn-secondary'}`}
+                                        style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
+                                      >
+                                        College Student
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleToggleMemberType(idx, 'External')}
+                                        className={`btn btn-sm ${member.memberType === 'External' ? 'btn-primary' : 'btn-secondary'}`}
+                                        style={{ fontSize: '0.78rem', padding: '0.25rem 0.65rem' }}
+                                      >
+                                        External Member
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Captain Row (Read-only) */}
+                                {isCaptain ? (
+                                  <div
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+                                      gap: '0.75rem',
+                                      fontSize: '0.88rem'
+                                    }}
+                                  >
+                                    <div>
+                                      <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>REGISTER NUMBER</span>
+                                      <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{student.registerNumber}</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STUDENT NAME</span>
+                                      <strong style={{ color: 'var(--text-primary)' }}>{student.name}</strong>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>DEPARTMENT / YEAR</span>
+                                      <span>{student.department} (Year {student.year})</span>
+                                    </div>
+                                    <div>
+                                      <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STATUS</span>
+                                      <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                        <CheckCircle2 size={14} /> Verified Captain
+                                      </span>
+                                    </div>
+                                  </div>
+                                ) : member.memberType === 'College' ? (
+                                  /* College Member Form */
+                                  <div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '1rem', alignItems: 'flex-start' }}>
+                                      <div className="form-group" style={{ margin: 0 }}>
+                                        <label className="form-label" style={{ fontSize: '0.82rem' }}>
+                                          Register Number <span style={{ color: 'var(--accent-rose)' }}>*</span>
+                                        </label>
+                                        <input
+                                          type="text"
+                                          className="form-input"
+                                          placeholder="e.g. 1301"
+                                          value={member.registerNumber}
+                                          onChange={(e) => handleMemberRegChange(idx, e.target.value)}
+                                          style={{ padding: '0.6rem 0.85rem' }}
+                                        />
+                                      </div>
+
+                                      {/* Live Verification Badge / Info */}
+                                      <div>
+                                        {lookup?.loading ? (
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-400)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
+                                            <Loader2 size={16} className="animate-spin" />
+                                            <span>Verifying register number...</span>
+                                          </div>
+                                        ) : lookup?.data || member.name ? (
+                                          <div
+                                            style={{
+                                              background: 'rgba(16, 185, 129, 0.08)',
+                                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                                              borderRadius: 'var(--radius-md)',
+                                              padding: '0.65rem 1rem',
+                                              marginTop: '0.25rem'
+                                            }}
+                                          >
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
+                                              <CheckCircle2 size={15} />
+                                              <span>Verified College Student</span>
+                                            </div>
+                                            <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                              <strong>{member.name}</strong> • {member.department} (Year {member.year})
+                                            </div>
+                                          </div>
+                                        ) : lookup?.error ? (
+                                          <div className="error-text" style={{ paddingTop: '1.75rem' }}>
+                                            <AlertCircle size={15} />
+                                            <span>{lookup.error}</span>
+                                          </div>
+                                        ) : (
+                                          <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', paddingTop: '1.75rem' }}>
+                                            Enter register number to auto-verify approved student
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  /* External Member Form */
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label className="form-label" style={{ fontSize: '0.82rem' }}>
+                                        Full Name <span style={{ color: 'var(--accent-rose)' }}>*</span>
+                                      </label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="External student full name"
+                                        value={member.name}
+                                        onChange={(e) => handleExternalFieldChange(idx, 'name', e.target.value)}
+                                        style={{ padding: '0.6rem 0.85rem' }}
+                                      />
+                                    </div>
+
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label className="form-label" style={{ fontSize: '0.82rem' }}>
+                                        Institution / College <span style={{ color: 'var(--accent-rose)' }}>*</span>
+                                      </label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="e.g. ABC Engineering College"
+                                        value={member.institution}
+                                        onChange={(e) => handleExternalFieldChange(idx, 'institution', e.target.value)}
+                                        style={{ padding: '0.6rem 0.85rem' }}
+                                      />
+                                    </div>
+
+                                    <div className="form-group" style={{ margin: 0 }}>
+                                      <label className="form-label" style={{ fontSize: '0.82rem' }}>
+                                        Student ID / Reg No (optional)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="External ID"
+                                        value={member.registerNumber}
+                                        onChange={(e) => handleExternalFieldChange(idx, 'registerNumber', e.target.value)}
+                                        style={{ padding: '0.6rem 0.85rem' }}
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Submission Summary Box */}
+                      <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--primary-500)' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <Sparkles size={18} color="var(--primary-400)" />
+                          <span>Submission Summary</span>
+                        </h3>
+
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
+                          <div>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>HACKATHON</span>
+                            <strong>{hackathon.name}</strong>
+                          </div>
+                          <div>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SUBMITTING CAPTAIN</span>
+                            <strong>{student.name} ({student.registerNumber})</strong>
+                          </div>
+                          <div>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>TOTAL TEAM SIZE</span>
+                            <strong>{teamSize} Members</strong>
+                          </div>
+                          <div>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SCREENSHOT ATTACHED</span>
+                            <span style={{ color: screenshotFile ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 600 }}>
+                              {screenshotFile ? `✓ ${screenshotFile.name}` : '❌ Not Uploaded'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(15, 23, 42, 0.7)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.1rem', fontSize: '0.85rem' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Team Members List:</div>
+                          <ol style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+                            {members.map((m, i) => (
+                              <li key={i}>
+                                <strong>{m.registerNumber || '(Ext)'}</strong> - {m.name || 'Pending Entry'} {m.institution && m.institution !== 'College' ? `(${m.institution})` : ''} - <span style={{ color: m.isCaptain ? 'var(--primary-400)' : m.memberType === 'External' ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>{m.isCaptain ? 'Team Captain' : m.memberType === 'External' ? 'External Participant' : 'College Student'}</span>
+                              </li>
+                            ))}
+                          </ol>
+                        </div>
+                      </div>
+
+                      {error && (
+                        <div className="alert alert-danger" style={{ marginBottom: '1.5rem' }}>
+                          <AlertCircle size={20} />
+                          <div>{error}</div>
+                        </div>
+                      )}
+
+                      {/* Submit Proof Button */}
+                      <button
+                        type="submit"
+                        className="btn btn-primary btn-lg btn-block"
+                        disabled={submitting || !screenshotFile}
+                        style={{ fontSize: '1.1rem', padding: '1rem 2rem' }}
+                      >
+                        {submitting ? (
+                          <>
+                            <Loader2 size={20} className="animate-spin" />
+                            <span>{existingSubmission && existingSubmission.status === 'Rejected' ? 'Resubmitting Corrected Proof...' : 'Submitting Registration Proof...'}</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>{existingSubmission && existingSubmission.status === 'Rejected' ? 'SUBMIT CORRECTED REGISTRATION PROOF' : 'SUBMIT REGISTRATION PROOF'}</span>
+                            <ArrowRight size={20} />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  )}
+                </>
               )}
             </>
           )}
