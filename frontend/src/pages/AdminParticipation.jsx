@@ -169,7 +169,8 @@ export default function AdminParticipation() {
                   <div
                     key={i}
                     style={{
-                      background: 'rgba(15, 23, 42, 0.8)',
+                      background: '#ffffff',
+                      border: '1px solid #f6deb2',
                       padding: '0.65rem 0.85rem',
                       borderRadius: 'var(--radius-sm)',
                       fontSize: '0.85rem',
@@ -181,7 +182,7 @@ export default function AdminParticipation() {
                     }}
                   >
                     <div>
-                      <strong className="font-mono text-primary">{dup.registerNumber}</strong> - {dup.studentName}
+                      <strong className="font-mono" style={{ color: 'var(--brand-forest)' }}>{dup.registerNumber}</strong> - <span style={{ color: 'var(--brand-navy)', fontWeight: 600 }}>{dup.studentName}</span>
                     </div>
                     <div style={{ fontSize: '0.8rem', color: 'var(--accent-amber)' }}>
                       Appears in {dup.occurrenceCount} teams ({dup.submissions.map(s => `Team T-${String(s.teamId).padStart(4, '0')} [${s.status}]`).join(', ')})

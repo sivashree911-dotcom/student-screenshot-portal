@@ -140,13 +140,13 @@ export default function MySubmissions() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.4rem' }}>
-                        <span className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--primary-400)' }}>
+                        <span className="font-mono" style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--brand-forest)' }}>
                           {sub.submission_id}
                         </span>
                         {getStatusBadge(sub.status)}
                       </div>
 
-                      <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.35rem' }}>
+                      <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.35rem', color: 'var(--brand-navy)' }}>
                         {sub.hackathon_name}
                       </h3>
                       <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
@@ -180,8 +180,8 @@ export default function MySubmissions() {
                     <div
                       style={{
                         marginTop: '1.25rem',
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        background: '#FDF2F2',
+                        border: '1px solid #f7c7c7',
                         borderRadius: 'var(--radius-md)',
                         padding: '0.85rem 1.1rem',
                         fontSize: '0.88rem'
@@ -191,7 +191,7 @@ export default function MySubmissions() {
                         <AlertCircle size={15} />
                         <span>Reason for Rejection:</span>
                       </div>
-                      <div style={{ color: '#fecaca' }}>{sub.rejection_reason}</div>
+                      <div style={{ color: 'var(--brand-navy)' }}>{sub.rejection_reason}</div>
                     </div>
                   )}
 
@@ -200,14 +200,14 @@ export default function MySubmissions() {
                     <div
                       style={{
                         marginTop: '1.25rem',
-                        background: 'rgba(245, 158, 11, 0.08)',
-                        border: '1px solid rgba(245, 158, 11, 0.3)',
+                        background: 'var(--brand-pale-gold)',
+                        border: '1px solid #f6deb2',
                         borderRadius: 'var(--radius-md)',
                         padding: '0.85rem 1.1rem',
                         fontSize: '0.88rem'
                       }}
                     >
-                      <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <div style={{ fontWeight: 700, color: '#925c0e', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                         <Clock size={15} />
                         <span>Corrected Submission Under Review</span>
                       </div>
@@ -231,8 +231,8 @@ export default function MySubmissions() {
                       flexWrap: 'wrap'
                     }}
                   >
-                    <div>Submitted: <strong style={{ color: 'var(--text-secondary)' }}>{formatDate(sub.created_at)}</strong></div>
-                    <div>Team Size: <strong style={{ color: 'var(--text-secondary)' }}>{sub.team_size} Members</strong></div>
+                    <div>Submitted: <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(sub.created_at)}</strong></div>
+                    <div>Team Size: <strong style={{ color: 'var(--brand-navy)' }}>{sub.team_size} Members</strong></div>
                   </div>
                 </div>
               ))}
@@ -250,10 +250,10 @@ export default function MySubmissions() {
         >
           <div>
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.82rem', color: 'var(--primary-400)', fontWeight: 700 }}>
+              <div style={{ fontSize: '0.82rem', color: 'var(--brand-forest)', fontWeight: 700 }}>
                 {selectedSub.hackathon_institution}
               </div>
-              <h3 style={{ fontSize: '1.35rem', fontWeight: 800 }}>{selectedSub.hackathon_name}</h3>
+              <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{selectedSub.hackathon_name}</h3>
               <div style={{ marginTop: '0.5rem' }}>{getStatusBadge(selectedSub.status)}</div>
             </div>
 
@@ -270,26 +270,26 @@ export default function MySubmissions() {
               <div
                 style={{
                   marginBottom: '1.25rem',
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  background: 'var(--brand-pale-gold)',
+                  border: '1px solid #f6deb2',
                   borderRadius: 'var(--radius-md)',
                   padding: '0.85rem 1.1rem',
                   fontSize: '0.88rem'
                 }}
               >
-                <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ fontWeight: 700, color: '#925c0e', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Clock size={15} />
                   <span>Corrected Resubmission Under Review</span>
                 </div>
                 <div style={{ color: 'var(--text-secondary)' }}>
-                  Prior rejection feedback: <span style={{ color: '#ffffff' }}>"{selectedSub.previous_rejection_reason}"</span>
+                  Prior rejection feedback: <span style={{ color: 'var(--brand-navy)', fontWeight: 600 }}>"{selectedSub.previous_rejection_reason}"</span>
                 </div>
               </div>
             )}
 
             {/* Team Members List */}
             <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.65rem' }}>
+              <h4 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '0.65rem', color: 'var(--brand-navy)' }}>
                 Registered Team Members ({selectedSub.team_members?.length || 0})
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
@@ -297,7 +297,8 @@ export default function MySubmissions() {
                   <div
                     key={m.id || i}
                     style={{
-                      background: 'rgba(15, 23, 42, 0.7)',
+                      background: 'var(--brand-pale-green)',
+                      border: '1px solid var(--border-subtle)',
                       padding: '0.65rem 0.85rem',
                       borderRadius: 'var(--radius-md)',
                       display: 'flex',
@@ -307,7 +308,7 @@ export default function MySubmissions() {
                     }}
                   >
                     <div>
-                      <strong style={{ color: '#ffffff' }}>{m.name}</strong>
+                      <strong style={{ color: 'var(--brand-navy)' }}>{m.name}</strong>
                       <span className="font-mono text-muted" style={{ marginLeft: '0.5rem' }}>
                         {m.register_number ? `(${m.register_number})` : ''}
                       </span>
@@ -326,7 +327,7 @@ export default function MySubmissions() {
             {selectedSub.screenshot_path && (
               <div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.65rem' }}>
-                  <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0 }}>
+                  <h4 style={{ fontSize: '1rem', fontWeight: 700, margin: 0, color: 'var(--brand-navy)' }}>
                     Submitted Screenshot Proof
                   </h4>
                   <a
@@ -347,14 +348,15 @@ export default function MySubmissions() {
                 </div>
                 <div
                   style={{
-                    background: '#000',
+                    background: '#ffffff',
                     borderRadius: 'var(--radius-md)',
                     overflow: 'hidden',
                     maxHeight: '350px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '1px solid var(--border-subtle)'
+                    border: '1px solid var(--border-subtle)',
+                    padding: '0.5rem'
                   }}
                 >
                   <img
@@ -365,7 +367,7 @@ export default function MySubmissions() {
                         : `/uploads/screenshots/${selectedSub.screenshot_path}`
                     }
                     alt="Registration Proof"
-                    style={{ maxWidth: '100%', maxHeight: '350px', objectFit: 'contain' }}
+                    style={{ maxWidth: '100%', maxHeight: '340px', objectFit: 'contain' }}
                   />
                 </div>
               </div>

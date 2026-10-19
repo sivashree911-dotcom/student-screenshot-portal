@@ -73,16 +73,16 @@ export default function FileUpload({ file, onFileSelect, onFileRemove, label = '
       {file && previewUrl ? (
         <div
           style={{
-            border: '2px solid rgba(16, 185, 129, 0.4)',
+            border: '2px solid #bce1ce',
             borderRadius: 'var(--radius-lg)',
-            padding: '1rem',
-            background: 'rgba(16, 185, 129, 0.05)',
+            padding: '1.15rem',
+            background: 'var(--brand-sage-light)',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.85rem'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--accent-emerald)', fontSize: '0.9rem', fontWeight: 600 }}>
               <CheckCircle size={18} />
               <span>Screenshot ready for submission</span>
@@ -115,21 +115,23 @@ export default function FileUpload({ file, onFileSelect, onFileRemove, label = '
               borderRadius: 'var(--radius-md)',
               overflow: 'hidden',
               maxHeight: '260px',
-              background: '#000',
+              background: '#ffffff',
+              border: '1px solid var(--border-subtle)',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              padding: '0.5rem'
             }}
           >
             <img
               src={previewUrl}
               alt="Screenshot Preview"
-              style={{ maxHeight: '260px', width: 'auto', objectFit: 'contain' }}
+              style={{ maxHeight: '250px', width: 'auto', objectFit: 'contain', borderRadius: 'var(--radius-sm)' }}
             />
           </div>
 
-          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Filename: <span className="font-mono text-secondary">{file.name}</span> ({(file.size / (1024 * 1024)).toFixed(2)} MB)
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)' }}>
+            Filename: <span className="font-mono" style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{file.name}</span> ({(file.size / (1024 * 1024)).toFixed(2)} MB)
           </div>
         </div>
       ) : (
@@ -140,11 +142,11 @@ export default function FileUpload({ file, onFileSelect, onFileRemove, label = '
           onDrop={handleDrop}
           onClick={() => inputRef.current?.click()}
           style={{
-            border: `2px dashed ${dragActive ? 'var(--primary-500)' : 'var(--border-card)'}`,
+            border: `2px dashed ${dragActive ? 'var(--brand-forest)' : 'var(--border-card)'}`,
             borderRadius: 'var(--radius-lg)',
-            padding: '2.5rem 1.5rem',
+            padding: '2.25rem 1.25rem',
             textAlign: 'center',
-            backgroundColor: dragActive ? 'rgba(99, 102, 241, 0.08)' : 'rgba(15, 23, 42, 0.5)',
+            backgroundColor: dragActive ? 'var(--brand-sage-light)' : 'var(--brand-pale-green)',
             cursor: 'pointer',
             transition: 'all var(--transition-fast)'
           }}
@@ -154,22 +156,23 @@ export default function FileUpload({ file, onFileSelect, onFileRemove, label = '
               width: '54px',
               height: '54px',
               borderRadius: '50%',
-              background: 'rgba(99, 102, 241, 0.15)',
-              color: 'var(--primary-400)',
+              background: 'var(--brand-sage-light)',
+              color: 'var(--brand-forest)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              margin: '0 auto 1rem'
+              margin: '0 auto 1rem',
+              border: '1px solid #c8ded0'
             }}
           >
-            <UploadCloud size={28} />
+            <UploadCloud size={26} />
           </div>
 
-          <div style={{ fontWeight: 600, fontSize: '1rem', color: 'var(--text-primary)', marginBottom: '0.35rem' }}>
+          <div style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--brand-navy)', marginBottom: '0.35rem' }}>
             Click to upload screenshot or drag & drop
           </div>
-          <div style={{ fontSize: '0.84rem', color: 'var(--text-muted)' }}>
-            Accepted formats: <strong style={{ color: 'var(--text-secondary)' }}>PNG, JPG, JPEG, WEBP</strong> (Max: 5 MB)
+          <div style={{ fontSize: '0.84rem', color: 'var(--text-secondary)' }}>
+            Accepted formats: <strong style={{ color: 'var(--brand-navy)' }}>PNG, JPG, JPEG, WEBP</strong> (Max: 5 MB)
           </div>
         </div>
       )}

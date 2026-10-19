@@ -214,23 +214,23 @@ export default function AdminHackathons() {
           </button>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '1.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))', gap: '1.5rem' }}>
           {hackathons.map((h) => (
             <div
               key={h.id}
-              className="card"
+              className="card card-hover"
               style={{
                 padding: 0,
                 overflow: 'hidden',
                 opacity: h.is_active ? 1 : 0.7,
-                border: h.is_active ? '1px solid var(--border-card)' : '1px dashed rgba(255,255,255,0.1)'
+                border: h.is_active ? '1px solid var(--border-card)' : '1px dashed var(--border-subtle)'
               }}
             >
               {/* Poster Preview */}
               <div
                 style={{
                   height: '160px',
-                  background: '#1e1b4b',
+                  background: 'linear-gradient(135deg, #E8F0EB 0%, #d4e5db 100%)',
                   position: 'relative',
                   display: 'flex',
                   alignItems: 'center',
@@ -249,9 +249,9 @@ export default function AdminHackathons() {
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
-                  <div style={{ color: 'rgba(255,255,255,0.6)', textAlign: 'center' }}>
+                  <div style={{ color: 'var(--brand-forest)', textAlign: 'center' }}>
                     <Trophy size={36} style={{ margin: '0 auto 0.25rem' }} />
-                    <span style={{ fontSize: '0.8rem' }}>No Poster Attached</span>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>No Poster Attached</span>
                   </div>
                 )}
 
@@ -268,26 +268,26 @@ export default function AdminHackathons() {
 
               {/* Card Body */}
               <div style={{ padding: '1.25rem' }}>
-                <div style={{ fontSize: '0.8rem', color: 'var(--primary-400)', fontWeight: 700 }}>
+                <div style={{ fontSize: '0.8rem', color: 'var(--brand-forest)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                   {h.institution}
                 </div>
-                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0.25rem 0 0.5rem', lineHeight: 1.3 }}>
+                <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: '0.25rem 0 0.5rem', lineHeight: 1.3, color: 'var(--brand-navy)' }}>
                   {h.name}
                 </h3>
 
                 <div style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', display: 'flex', flexDirection: 'column', gap: '0.35rem', margin: '0.85rem 0' }}>
-                  <div>Dates: <strong>{formatDate(h.start_date)} – {formatDate(h.end_date)}</strong></div>
-                  <div>Deadline: <strong>{formatDate(h.registration_deadline)}</strong></div>
-                  <div>Team Size: <strong>{h.min_team_size}–{h.max_team_size} Members</strong> ({h.allow_external_participants ? 'External Allowed' : 'College Only'})</div>
+                  <div>Dates: <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(h.start_date)} – {formatDate(h.end_date)}</strong></div>
+                  <div>Deadline: <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(h.registration_deadline)}</strong></div>
+                  <div>Team Size: <strong style={{ color: 'var(--brand-navy)' }}>{h.min_team_size}–{h.max_team_size} Members</strong> ({h.allow_external_participants ? 'External Allowed' : 'College Only'})</div>
                 </div>
 
                 {/* Submissions Mini Stats */}
-                <div style={{ display: 'flex', gap: '0.75rem', background: 'rgba(15, 23, 42, 0.6)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', marginBottom: '1.25rem' }}>
-                  <div>Total: <strong>{h.total_submissions || 0}</strong></div>
+                <div style={{ display: 'flex', gap: '0.75rem', background: 'var(--brand-pale-green)', border: '1px solid var(--border-subtle)', padding: '0.65rem 0.85rem', borderRadius: 'var(--radius-md)', fontSize: '0.78rem', marginBottom: '1.25rem', color: 'var(--text-secondary)' }}>
+                  <div>Total: <strong style={{ color: 'var(--brand-navy)' }}>{h.total_submissions || 0}</strong></div>
                   <div>•</div>
                   <div style={{ color: 'var(--accent-emerald)' }}>Verified: <strong>{h.verified_submissions || 0}</strong></div>
                   <div>•</div>
-                  <div style={{ color: 'var(--accent-amber)' }}>Pending: <strong>{h.pending_submissions || 0}</strong></div>
+                  <div style={{ color: 'var(--brand-soft-gold)' }}>Pending: <strong>{h.pending_submissions || 0}</strong></div>
                 </div>
 
                 {/* Actions */}
@@ -472,8 +472,8 @@ export default function AdminHackathons() {
                   onChange={handlePosterChange}
                 />
                 {posterPreview && (
-                  <div style={{ marginTop: '0.75rem', maxHeight: '160px', overflow: 'hidden', borderRadius: 'var(--radius-md)', background: '#000', textAlign: 'center' }}>
-                    <img src={posterPreview} alt="Poster preview" style={{ maxHeight: '160px', width: 'auto', objectFit: 'contain' }} />
+                  <div style={{ marginTop: '0.75rem', maxHeight: '160px', overflow: 'hidden', borderRadius: 'var(--radius-md)', background: '#ffffff', border: '1px solid var(--border-subtle)', textAlign: 'center', padding: '0.5rem' }}>
+                    <img src={posterPreview} alt="Poster preview" style={{ maxHeight: '150px', width: 'auto', objectFit: 'contain' }} />
                   </div>
                 )}
               </div>

@@ -61,7 +61,7 @@ export default function AdminLogin() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.5rem',
-        background: '#070b14',
+        background: 'var(--bg-primary)',
         position: 'relative'
       }}
     >
@@ -71,10 +71,10 @@ export default function AdminLogin() {
           top: '30%',
           left: '50%',
           transform: 'translate(-50%, -50%)',
-          width: '500px',
-          height: '400px',
-          background: 'radial-gradient(circle, rgba(147, 51, 234, 0.15) 0%, transparent 70%)',
-          filter: 'blur(60px)',
+          width: '450px',
+          height: '350px',
+          background: 'radial-gradient(circle, rgba(120, 157, 141, 0.15) 0%, transparent 70%)',
+          filter: 'blur(50px)',
           pointerEvents: 'none'
         }}
       />
@@ -86,26 +86,29 @@ export default function AdminLogin() {
               width: '60px',
               height: '60px',
               borderRadius: 'var(--radius-xl)',
-              background: 'linear-gradient(135deg, #4f46e5, #9333ea)',
+              background: 'var(--primary-gradient)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 1.25rem',
-              boxShadow: '0 8px 24px rgba(147, 51, 234, 0.35)'
+              boxShadow: '0 4px 16px rgba(80, 121, 104, 0.35)'
             }}
           >
             <ShieldCheck size={30} color="#ffffff" />
           </div>
 
-          <h1 style={{ fontSize: '1.85rem', fontWeight: 800, marginBottom: '0.35rem' }}>
-            Administrator Login
+          <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--brand-navy)' }}>
+            EVIDERA
           </h1>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Secure portal management and participation tracking
+          <div style={{ fontSize: '0.92rem', color: 'var(--brand-forest)', fontWeight: 600, marginBottom: '0.4rem' }}>
+            Every Milestone Matters.
+          </div>
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+            Administrator Portal • Secure System Access
           </p>
         </div>
 
-        <div className="card" style={{ padding: '2rem', background: '#0f172a', border: '1px solid rgba(255,255,255,0.12)' }}>
+        <div className="card" style={{ padding: '2rem' }}>
           <form onSubmit={handleLogin}>
             <div className="form-group">
               <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
@@ -150,8 +153,7 @@ export default function AdminLogin() {
               className="btn btn-primary btn-lg btn-block"
               disabled={loading || !email.trim() || !password}
               style={{
-                marginTop: '0.75rem',
-                background: 'linear-gradient(135deg, #4f46e5 0%, #9333ea 100%)'
+                marginTop: '0.75rem'
               }}
             >
               {loading ? (
@@ -170,7 +172,7 @@ export default function AdminLogin() {
         </div>
 
         <div style={{ textAlign: 'center', marginTop: '1.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-          Authorized Personnel Only • IP & Session Logged
+          Authorized Personnel Only • Session & Audit Logged
         </div>
       </div>
     </div>

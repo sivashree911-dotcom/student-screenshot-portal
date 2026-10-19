@@ -393,22 +393,23 @@ export default function HackathonDetailSubmission() {
                   width: '72px',
                   height: '72px',
                   borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.15)',
+                  background: 'var(--brand-sage-light)',
                   color: 'var(--accent-emerald)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: '0 auto 1.5rem',
-                  boxShadow: '0 0 30px rgba(16, 185, 129, 0.25)'
+                  boxShadow: '0 4px 14px rgba(46, 125, 91, 0.2)',
+                  border: '1px solid #bce1ce'
                 }}
               >
                 <CheckCircle2 size={42} />
               </div>
 
-              <h1 style={{ fontSize: '2rem', fontWeight: 800, color: '#ffffff', marginBottom: '0.5rem' }}>
+              <h1 style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--brand-navy)', marginBottom: '0.5rem' }}>
                 {submissionSuccess.isResubmission ? 'Registration Resubmitted Successfully' : 'Registration Submitted Successfully'}
               </h1>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', marginBottom: '2rem' }}>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '1.02rem', marginBottom: '2rem' }}>
                 {submissionSuccess.isResubmission
                   ? 'Your corrected registration proof has been submitted successfully and sent for administrative review.'
                   : 'Your registration proof has been submitted successfully and sent for administrative verification.'}
@@ -417,7 +418,7 @@ export default function HackathonDetailSubmission() {
               {/* Submission Details Box */}
               <div
                 style={{
-                  background: 'rgba(15, 23, 42, 0.8)',
+                  background: 'var(--brand-pale-green)',
                   border: '1px solid var(--border-card)',
                   borderRadius: 'var(--radius-lg)',
                   padding: '1.75rem',
@@ -430,7 +431,7 @@ export default function HackathonDetailSubmission() {
                   <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
                     Submission ID
                   </div>
-                  <div className="font-mono" style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--primary-400)' }}>
+                  <div className="font-mono" style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--brand-forest)' }}>
                     {submissionSuccess.submissionId}
                   </div>
                 </div>
@@ -451,7 +452,7 @@ export default function HackathonDetailSubmission() {
                     <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)' }}>
                       Team Size
                     </div>
-                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: '#ffffff', marginTop: '0.25rem' }}>
+                    <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--brand-navy)', marginTop: '0.25rem' }}>
                       {submissionSuccess.teamSize} Members
                     </div>
                   </div>
@@ -471,123 +472,154 @@ export default function HackathonDetailSubmission() {
           ) : (
             <>
               {/* Hackathon Overview Banner */}
-              <div className="card" style={{ marginBottom: '2rem', padding: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
-                  <div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--primary-400)', fontWeight: 700, marginBottom: '0.35rem' }}>
-                      {hackathon.institution}
-                    </div>
-                    <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.75rem' }}>
-                      {hackathon.name}
-                    </h1>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', maxWidth: '650px', lineHeight: 1.6 }}>
-                      {hackathon.description}
-                    </p>
+              <div className="card" style={{ marginBottom: '2rem', padding: 0, overflow: 'hidden' }}>
+                {/* Poster if available */}
+                {hackathon.poster_path && (
+                  <div
+                    style={{
+                      maxHeight: '260px',
+                      width: '100%',
+                      overflow: 'hidden',
+                      background: 'var(--brand-sage-light)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderBottom: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    <img
+                      src={
+                        hackathon.poster_path.startsWith('http://') || hackathon.poster_path.startsWith('https://')
+                          ? hackathon.poster_path
+                          : `/uploads/posters/${hackathon.poster_path}`
+                      }
+                      alt={hackathon.name}
+                      style={{ width: '100%', maxHeight: '260px', objectFit: 'cover' }}
+                      onError={(e) => {
+                        e.target.parentElement.style.display = 'none';
+                      }}
+                    />
                   </div>
+                )}
 
-                  <span className="badge badge-college" style={{ fontSize: '0.85rem' }}>
-                    {hackathon.mode}
-                  </span>
-                </div>
-
-                <div
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    gap: '1rem',
-                    marginTop: '1.5rem',
-                    paddingTop: '1.5rem',
-                    borderTop: '1px solid var(--border-subtle)'
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                    <Calendar size={16} color="var(--primary-400)" />
+                <div style={{ padding: '2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                      <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>DATES</span>
-                      <strong>{formatDate(hackathon.start_date)} – {formatDate(hackathon.end_date)}</strong>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                    <Clock size={16} color="var(--accent-amber)" />
-                    <div>
-                      <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>REGISTRATION DEADLINE</span>
-                      <strong>{formatDate(hackathon.registration_deadline)}</strong>
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.9rem' }}>
-                    <Users size={16} color="var(--accent-cyan)" />
-                    <div>
-                      <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>REQUIRED TEAM SIZE</span>
-                      <strong>{hackathon.min_team_size}–{hackathon.max_team_size} Members</strong>
-                    </div>
-                  </div>
-                </div>
-
-                {/* External Registration Action Card */}
-                <div
-                  style={{
-                    marginTop: '1.75rem',
-                    background: 'rgba(99, 102, 241, 0.08)',
-                    border: '1px solid rgba(99, 102, 241, 0.25)',
-                    borderRadius: 'var(--radius-md)',
-                    padding: '1.25rem',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    flexWrap: 'wrap',
-                    gap: '1rem'
-                  }}
-                >
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: '0.98rem', color: '#ffffff' }}>
-                      Step 1: Complete Registration on Official Portal
-                    </div>
-                    <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
-                      Register on the external portal, save your confirmation screenshot, then return here.
-                    </div>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
-                    <a
-                      href={hackathon.registration_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="btn btn-outline"
-                    >
-                      <span>REGISTER NOW</span>
-                      <ExternalLink size={15} />
-                    </a>
-
-                    {!hasCompletedExternalReg ? (
-                      <button
-                        type="button"
-                        onClick={() => setHasCompletedExternalReg(true)}
-                        className="btn btn-primary"
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>I HAVE COMPLETED REGISTRATION</span>
-                      </button>
-                    ) : (
-                      <div
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '0.4rem',
-                          color: 'var(--accent-emerald)',
-                          fontWeight: 700,
-                          fontSize: '0.9rem',
-                          padding: '0.5rem 0.85rem',
-                          background: 'rgba(16, 185, 129, 0.1)',
-                          borderRadius: 'var(--radius-md)',
-                          border: '1px solid rgba(16, 185, 129, 0.3)'
-                        }}
-                      >
-                        <CheckCircle2 size={16} />
-                        <span>Registration Step Completed</span>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--brand-forest)', fontWeight: 700, marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {hackathon.institution}
                       </div>
-                    )}
+                      <h1 style={{ fontSize: '2rem', fontWeight: 800, marginBottom: '0.75rem', color: 'var(--brand-navy)' }}>
+                        {hackathon.name}
+                      </h1>
+                      <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem', maxWidth: '650px', lineHeight: 1.6 }}>
+                        {hackathon.description}
+                      </p>
+                    </div>
+
+                    <span className="badge badge-college" style={{ fontSize: '0.85rem' }}>
+                      {hackathon.mode}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+                      gap: '1rem',
+                      marginTop: '1.5rem',
+                      paddingTop: '1.5rem',
+                      borderTop: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.9rem' }}>
+                      <Calendar size={18} style={{ color: 'var(--brand-forest)', flexShrink: 0 }} />
+                      <div>
+                        <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block', fontWeight: 600 }}>DATES</span>
+                        <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(hackathon.start_date)} – {formatDate(hackathon.end_date)}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.9rem' }}>
+                      <Clock size={18} style={{ color: 'var(--brand-soft-gold)', flexShrink: 0 }} />
+                      <div>
+                        <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block', fontWeight: 600 }}>REGISTRATION DEADLINE</span>
+                        <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(hackathon.registration_deadline)}</strong>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.9rem' }}>
+                      <Users size={18} style={{ color: 'var(--brand-forest)', flexShrink: 0 }} />
+                      <div>
+                        <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block', fontWeight: 600 }}>REQUIRED TEAM SIZE</span>
+                        <strong style={{ color: 'var(--brand-navy)' }}>{hackathon.min_team_size}–{hackathon.max_team_size} Members</strong>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* External Registration Action Card */}
+                  <div
+                    style={{
+                      marginTop: '1.75rem',
+                      background: 'var(--brand-sage-light)',
+                      border: '1px solid #c9dcd0',
+                      borderRadius: 'var(--radius-md)',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '1rem'
+                    }}
+                  >
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--brand-navy)' }}>
+                        Step 1: Complete Registration on Official Portal
+                      </div>
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                        Register on the external portal, save your confirmation screenshot, then return here.
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+                      <a
+                        href={hackathon.registration_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-outline"
+                      >
+                        <span>REGISTER NOW</span>
+                        <ExternalLink size={15} />
+                      </a>
+
+                      {!hasCompletedExternalReg ? (
+                        <button
+                          type="button"
+                          onClick={() => setHasCompletedExternalReg(true)}
+                          className="btn btn-primary"
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>I HAVE COMPLETED REGISTRATION</span>
+                        </button>
+                      ) : (
+                        <div
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            color: 'var(--accent-emerald)',
+                            fontWeight: 700,
+                            fontSize: '0.9rem',
+                            padding: '0.5rem 0.85rem',
+                            background: '#E8F5EE',
+                            borderRadius: 'var(--radius-md)',
+                            border: '1px solid #bce1ce'
+                          }}
+                        >
+                          <CheckCircle2 size={16} />
+                          <span>Registration Step Completed</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -602,12 +634,16 @@ export default function HackathonDetailSubmission() {
                       borderRadius: '50%',
                       background:
                         existingSubmission.status === 'Verified'
-                          ? 'rgba(16, 185, 129, 0.15)'
-                          : 'rgba(245, 158, 11, 0.15)',
+                          ? 'var(--brand-sage-light)'
+                          : 'var(--brand-pale-gold)',
                       color:
                         existingSubmission.status === 'Verified'
                           ? 'var(--accent-emerald)'
-                          : 'var(--accent-amber)',
+                          : 'var(--brand-soft-gold)',
+                      border:
+                        existingSubmission.status === 'Verified'
+                          ? '1px solid #bce1ce'
+                          : '1px solid #f6deb2',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -621,7 +657,7 @@ export default function HackathonDetailSubmission() {
                     )}
                   </div>
 
-                  <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem', color: '#ffffff' }}>
+                  <h2 style={{ fontSize: '1.6rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>
                     {existingSubmission.status === 'Verified'
                       ? 'Registration Proof Verified & Approved'
                       : 'Registration Proof Under Review'}
@@ -635,7 +671,7 @@ export default function HackathonDetailSubmission() {
 
                   <div
                     style={{
-                      background: 'rgba(15, 23, 42, 0.75)',
+                      background: 'var(--brand-pale-green)',
                       border: '1px solid var(--border-subtle)',
                       borderRadius: 'var(--radius-md)',
                       padding: '1.25rem',
@@ -647,10 +683,10 @@ export default function HackathonDetailSubmission() {
                     }}
                   >
                     <div style={{ textAlign: 'left' }}>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase' }}>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', textTransform: 'uppercase', fontWeight: 600 }}>
                         Submission ID
                       </div>
-                      <div className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-400)', fontSize: '1.1rem' }}>
+                      <div className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-forest)', fontSize: '1.1rem' }}>
                         {existingSubmission.submission_id}
                       </div>
                     </div>
@@ -679,8 +715,8 @@ export default function HackathonDetailSubmission() {
                     <div
                       style={{
                         marginBottom: '2rem',
-                        background: 'rgba(239, 68, 68, 0.08)',
-                        border: '1px solid rgba(239, 68, 68, 0.35)',
+                        background: '#FDF2F2',
+                        border: '1px solid #f7c7c7',
                         borderRadius: 'var(--radius-lg)',
                         padding: '1.5rem'
                       }}
@@ -697,17 +733,19 @@ export default function HackathonDetailSubmission() {
                       </p>
                       <div
                         style={{
-                          background: 'rgba(15, 23, 42, 0.8)',
+                          background: '#ffffff',
                           borderRadius: 'var(--radius-md)',
                           padding: '0.85rem 1.15rem',
                           borderLeft: '4px solid var(--accent-rose)',
+                          border: '1px solid #f7c7c7',
+                          borderLeftWidth: '4px',
                           marginBottom: '0.75rem'
                         }}
                       >
                         <div style={{ fontSize: '0.78rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--accent-rose)', fontWeight: 700, marginBottom: '0.25rem' }}>
                           Reason for Rejection:
                         </div>
-                        <div style={{ color: '#ffffff', fontWeight: 600, fontSize: '0.95rem' }}>
+                        <div style={{ color: 'var(--brand-navy)', fontWeight: 600, fontSize: '0.95rem' }}>
                           {existingSubmission.rejection_reason || 'Registration proof was rejected.'}
                         </div>
                       </div>
@@ -722,7 +760,7 @@ export default function HackathonDetailSubmission() {
                     <form onSubmit={handleSubmitProof}>
                       {/* Proof Upload Card */}
                       <div className="card" style={{ marginBottom: '2rem' }}>
-                        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.35rem' }}>
+                        <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.35rem', color: 'var(--brand-navy)' }}>
                           {existingSubmission && existingSubmission.status === 'Rejected' ? 'Upload Corrected Registration Proof' : 'Upload Registration Proof'}
                         </h2>
                         <p style={{ color: 'var(--text-secondary)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
@@ -743,7 +781,7 @@ export default function HackathonDetailSubmission() {
                       <div className="card" style={{ marginBottom: '2rem' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem' }}>
                           <div>
-                            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.25rem' }}>
+                            <h2 style={{ fontSize: '1.4rem', fontWeight: 800, marginBottom: '0.25rem', color: 'var(--brand-navy)' }}>
                               Team Details
                             </h2>
                             <p style={{ color: 'var(--text-secondary)', fontSize: '0.88rem' }}>
@@ -784,15 +822,15 @@ export default function HackathonDetailSubmission() {
                               <div
                                 key={idx}
                                 style={{
-                                  background: isCaptain ? 'rgba(99, 102, 241, 0.08)' : 'rgba(15, 23, 42, 0.6)',
-                                  border: `1px solid ${isCaptain ? 'rgba(99, 102, 241, 0.3)' : 'var(--border-subtle)'}`,
+                                  background: isCaptain ? 'var(--brand-sage-light)' : 'var(--brand-pale-green)',
+                                  border: `1px solid ${isCaptain ? '#c8ddd0' : 'var(--border-subtle)'}`,
                                   borderRadius: 'var(--radius-lg)',
                                   padding: '1.25rem'
                                 }}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: '#ffffff' }}>
+                                    <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--brand-navy)' }}>
                                       Member {idx + 1}
                                     </span>
                                     {isCaptain ? (
@@ -841,15 +879,15 @@ export default function HackathonDetailSubmission() {
                                   >
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>REGISTER NUMBER</span>
-                                      <span className="font-mono" style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{student.registerNumber}</span>
+                                      <span className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{student.registerNumber}</span>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STUDENT NAME</span>
-                                      <strong style={{ color: 'var(--text-primary)' }}>{student.name}</strong>
+                                      <strong style={{ color: 'var(--brand-navy)' }}>{student.name}</strong>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>DEPARTMENT / YEAR</span>
-                                      <span>{student.department} (Year {student.year})</span>
+                                      <span style={{ color: 'var(--text-secondary)' }}>{student.department} (Year {student.year})</span>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STATUS</span>
@@ -879,15 +917,15 @@ export default function HackathonDetailSubmission() {
                                       {/* Live Verification Badge / Info */}
                                       <div>
                                         {lookup?.loading ? (
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--primary-400)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--brand-forest)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
                                             <Loader2 size={16} className="animate-spin" />
                                             <span>Verifying register number...</span>
                                           </div>
                                         ) : lookup?.data || member.name ? (
                                           <div
                                             style={{
-                                              background: 'rgba(16, 185, 129, 0.08)',
-                                              border: '1px solid rgba(16, 185, 129, 0.3)',
+                                              background: 'var(--brand-sage-light)',
+                                              border: '1px solid #bce1ce',
                                               borderRadius: 'var(--radius-md)',
                                               padding: '0.65rem 1rem',
                                               marginTop: '0.25rem'
@@ -897,7 +935,7 @@ export default function HackathonDetailSubmission() {
                                               <CheckCircle2 size={15} />
                                               <span>Verified College Student</span>
                                             </div>
-                                            <div style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                                            <div style={{ fontSize: '0.88rem', color: 'var(--brand-navy)' }}>
                                               <strong>{member.name}</strong> • {member.department} (Year {member.year})
                                             </div>
                                           </div>
@@ -967,39 +1005,39 @@ export default function HackathonDetailSubmission() {
                       </div>
 
                       {/* Submission Summary Box */}
-                      <div className="card" style={{ marginBottom: '2rem', border: '1px solid var(--primary-500)' }}>
-                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <Sparkles size={18} color="var(--primary-400)" />
+                      <div className="card" style={{ marginBottom: '2rem', border: '1.5px solid var(--brand-forest)' }}>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--brand-navy)' }}>
+                          <Sparkles size={18} color="var(--brand-forest)" />
                           <span>Submission Summary</span>
                         </h3>
 
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
                           <div>
-                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>HACKATHON</span>
-                            <strong>{hackathon.name}</strong>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>HACKATHON</span>
+                            <strong style={{ color: 'var(--brand-navy)' }}>{hackathon.name}</strong>
                           </div>
                           <div>
-                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SUBMITTING CAPTAIN</span>
-                            <strong>{student.name} ({student.registerNumber})</strong>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>SUBMITTING CAPTAIN</span>
+                            <strong style={{ color: 'var(--brand-navy)' }}>{student.name} ({student.registerNumber})</strong>
                           </div>
                           <div>
-                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>TOTAL TEAM SIZE</span>
-                            <strong>{teamSize} Members</strong>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>TOTAL TEAM SIZE</span>
+                            <strong style={{ color: 'var(--brand-navy)' }}>{teamSize} Members</strong>
                           </div>
                           <div>
-                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block' }}>SCREENSHOT ATTACHED</span>
+                            <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>SCREENSHOT ATTACHED</span>
                             <span style={{ color: screenshotFile ? 'var(--accent-emerald)' : 'var(--accent-rose)', fontWeight: 600 }}>
                               {screenshotFile ? `✓ ${screenshotFile.name}` : '❌ Not Uploaded'}
                             </span>
                           </div>
                         </div>
 
-                        <div style={{ background: 'rgba(15, 23, 42, 0.7)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.1rem', fontSize: '0.85rem' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--text-secondary)', marginBottom: '0.4rem' }}>Team Members List:</div>
+                        <div style={{ background: 'var(--brand-pale-green)', borderRadius: 'var(--radius-md)', padding: '0.85rem 1.1rem', fontSize: '0.85rem', border: '1px solid var(--border-subtle)' }}>
+                          <div style={{ fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.4rem' }}>Team Members List:</div>
                           <ol style={{ paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
                             {members.map((m, i) => (
-                              <li key={i}>
-                                <strong>{m.registerNumber || '(Ext)'}</strong> - {m.name || 'Pending Entry'} {m.institution && m.institution !== 'College' ? `(${m.institution})` : ''} - <span style={{ color: m.isCaptain ? 'var(--primary-400)' : m.memberType === 'External' ? 'var(--accent-amber)' : 'var(--accent-emerald)' }}>{m.isCaptain ? 'Team Captain' : m.memberType === 'External' ? 'External Participant' : 'College Student'}</span>
+                              <li key={i} style={{ color: 'var(--text-primary)' }}>
+                                <strong>{m.registerNumber || '(Ext)'}</strong> - {m.name || 'Pending Entry'} {m.institution && m.institution !== 'College' ? `(${m.institution})` : ''} - <span style={{ color: m.isCaptain ? 'var(--brand-forest)' : m.memberType === 'External' ? 'var(--brand-soft-gold)' : 'var(--accent-emerald)', fontWeight: 600 }}>{m.isCaptain ? 'Team Captain' : m.memberType === 'External' ? 'External Participant' : 'College Student'}</span>
                               </li>
                             ))}
                           </ol>

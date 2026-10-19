@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useLocation, useNavigate, Outlet } from 'react-router-dom';
 import { useAdminAuth } from '../context/AdminAuthContext';
 import {
@@ -12,17 +12,23 @@ import {
   Settings,
   LogOut,
   ShieldCheck,
-  ExternalLink
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function AdminLayout() {
   const { admin, logoutAdmin } = useAdminAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const handleLogout = () => {
     logoutAdmin();
     navigate('/admin/login');
+  };
+
+  const closeSidebar = () => {
+    setSidebarOpen(false);
   };
 
   const navItems = [
@@ -38,16 +44,30 @@ export default function AdminLayout() {
 
   return (
     <div className="admin-wrapper">
+      {/* Mobile Backdrop Overlay */}
+      {sidebarOpen && (
+        <div
+          onClick={closeSidebar}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(20, 42, 59, 0.4)',
+            zIndex: 35,
+            backdropFilter: 'blur(2px)'
+          }}
+        />
+      )}
+
       {/* Sidebar */}
-      <aside className="admin-sidebar">
+      <aside className={`admin-sidebar ${sidebarOpen ? 'open' : ''}`}>
         <div className="sidebar-header">
           <div className="sidebar-brand">
-            <div className="brand-icon" style={{ background: 'linear-gradient(135deg, #4f46e5, #9333ea)' }}>
+            <div className="brand-icon">
               <ShieldCheck size={20} color="#ffffff" />
             </div>
-            <div className="sidebar-text">
-              <div style={{ fontSize: '0.95rem', fontWeight: 800 }}>ADMIN PORTAL</div>
-              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 500 }}>Control Center</div>
+            <div className="brand-text-wrapper">
+              <span className="brand-title">EVIDERA</span>
+              <span className="brand-tagline">Admin Control Center</span>
             </div>
           </div>
         </div>
@@ -61,22 +81,26 @@ export default function AdminLayout() {
                 key={item.path}
                 to={item.path}
                 className={`sidebar-link ${isActive ? 'active' : ''}`}
+                onClick={closeSidebar}
               >
                 <Icon size={18} />
-                <span className="sidebar-text">{item.label}</span>
+                <span>{item.label}</span>
               </Link>
             );
           })}
         </nav>
 
         <div className="sidebar-footer">
+          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '0.5rem', fontWeight: 600 }}>
+            Every Milestone Matters.
+          </div>
           <button
             onClick={handleLogout}
             className="btn btn-secondary btn-sm btn-block"
             style={{ justifyContent: 'flex-start', gap: '0.65rem' }}
           >
             <LogOut size={16} />
-            <span className="sidebar-text">Logout</span>
+            <span>Logout</span>
           </button>
         </div>
       </aside>
@@ -84,14 +108,26 @@ export default function AdminLayout() {
       {/* Main Content Area */}
       <main className="admin-main">
         <header className="admin-header">
-          <div>
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>Logged in as</span>
-            <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-              {admin?.name || 'Portal Administrator'}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setSidebarOpen(!sidebarOpen)}
+              style={{ padding: '0.45rem', display: 'flex', alignItems: 'center' }}
+              aria-label="Toggle admin navigation"
+            >
+              {sidebarOpen ? <X size={20} /> : <Menu size={20} />}
+            </button>
+
+            <div>
+              <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Logged in as</span>
+              <div style={{ fontSize: '0.94rem', fontWeight: 700, color: 'var(--brand-navy)' }}>
+                {admin?.name || 'Portal Administrator'}
+              </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
             <span className="badge badge-college font-mono" style={{ textTransform: 'none' }}>
               {admin?.email || 'admin@college.edu'}
             </span>

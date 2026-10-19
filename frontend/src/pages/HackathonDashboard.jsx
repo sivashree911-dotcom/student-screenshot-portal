@@ -8,10 +8,8 @@ import {
   Clock,
   Users,
   MapPin,
-  ExternalLink,
   ChevronRight,
   Sparkles,
-  Layers,
   AlertCircle
 } from 'lucide-react';
 
@@ -49,21 +47,37 @@ export default function HackathonDashboard() {
         <div className="container">
           {/* Header Banner */}
           <div style={{ marginBottom: '2.5rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--primary-400)', fontSize: '0.85rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '0.4rem' }}>
-              <Sparkles size={16} />
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                color: 'var(--brand-forest)',
+                background: 'var(--brand-sage-light)',
+                padding: '0.35rem 0.75rem',
+                borderRadius: 'var(--radius-full)',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                textTransform: 'uppercase',
+                letterSpacing: '0.06em',
+                marginBottom: '0.75rem',
+                border: '1px solid #c9dcd0'
+              }}
+            >
+              <Sparkles size={14} />
               <span>COLLEGE HACKATHON DIRECTORY</span>
             </div>
-            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '0.5rem' }}>
+            <h1 style={{ fontSize: '2.2rem', fontWeight: 800, marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>
               Available Hackathons
             </h1>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '1.05rem', maxWidth: '650px' }}>
+            <p style={{ color: 'var(--text-secondary)', fontSize: '1.02rem', maxWidth: '650px', lineHeight: 1.6 }}>
               Select a hackathon below to register on the official website, upload your registration proof screenshot, and register your team members.
             </p>
           </div>
 
           {loading ? (
             <div style={{ textAlign: 'center', padding: '4rem 0', color: 'var(--text-muted)' }}>
-              <div style={{ fontSize: '1.1rem', fontWeight: 600 }}>Loading active hackathons...</div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 600, color: 'var(--brand-forest)' }}>Loading active hackathons...</div>
             </div>
           ) : error ? (
             <div className="alert alert-danger">
@@ -72,8 +86,8 @@ export default function HackathonDashboard() {
             </div>
           ) : hackathons.length === 0 ? (
             <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
-              <Trophy size={48} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem' }} />
-              <h3>No Active Hackathons Available</h3>
+              <Trophy size={48} style={{ color: 'var(--brand-sage)', margin: '0 auto 1rem' }} />
+              <h3 style={{ color: 'var(--brand-navy)' }}>No Active Hackathons Available</h3>
               <p style={{ color: 'var(--text-secondary)', marginTop: '0.5rem' }}>
                 There are currently no active hackathons open for submission. Please check back later.
               </p>
@@ -82,7 +96,7 @@ export default function HackathonDashboard() {
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))',
                 gap: '1.75rem'
               }}
             >
@@ -109,7 +123,7 @@ export default function HackathonDashboard() {
                     <div
                       style={{
                         height: '190px',
-                        background: 'linear-gradient(135deg, #1e1b4b, #312e81)',
+                        background: 'linear-gradient(135deg, #E8F0EB 0%, #d4e5db 100%)',
                         position: 'relative',
                         display: 'flex',
                         alignItems: 'center',
@@ -127,9 +141,9 @@ export default function HackathonDashboard() {
                           }}
                         />
                       ) : (
-                        <div style={{ textAlign: 'center', padding: '1rem', color: 'rgba(255,255,255,0.7)' }}>
+                        <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--brand-forest)' }}>
                           <Trophy size={40} style={{ margin: '0 auto 0.5rem' }} />
-                          <div style={{ fontSize: '0.9rem', fontWeight: 600 }}>{h.institution}</div>
+                          <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{h.institution}</div>
                         </div>
                       )}
 
@@ -138,14 +152,15 @@ export default function HackathonDashboard() {
                           position: 'absolute',
                           top: '12px',
                           right: '12px',
-                          background: 'rgba(0, 0, 0, 0.65)',
+                          background: 'rgba(255, 255, 255, 0.92)',
                           backdropFilter: 'blur(8px)',
                           padding: '0.3rem 0.65rem',
                           borderRadius: 'var(--radius-full)',
                           fontSize: '0.75rem',
                           fontWeight: 700,
-                          color: '#ffffff',
-                          border: '1px solid rgba(255,255,255,0.15)'
+                          color: 'var(--brand-forest-dark)',
+                          border: '1px solid var(--border-subtle)',
+                          boxShadow: '0 2px 6px rgba(0,0,0,0.06)'
                         }}
                       >
                         {h.mode}
@@ -154,19 +169,19 @@ export default function HackathonDashboard() {
 
                     {/* Content Section */}
                     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
-                      <div style={{ fontSize: '0.82rem', color: 'var(--primary-400)', fontWeight: 700, marginBottom: '0.35rem' }}>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--brand-forest)', fontWeight: 700, marginBottom: '0.35rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                         {h.institution}
                       </div>
 
-                      <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.75rem', lineHeight: 1.3 }}>
+                      <h3 style={{ fontSize: '1.3rem', fontWeight: 800, marginBottom: '0.65rem', lineHeight: 1.3, color: 'var(--brand-navy)' }}>
                         {h.name}
                       </h3>
 
                       <p
                         style={{
                           color: 'var(--text-secondary)',
-                          fontSize: '0.88rem',
-                          lineHeight: 1.5,
+                          fontSize: '0.9rem',
+                          lineHeight: 1.55,
                           marginBottom: '1.25rem',
                           display: '-webkit-box',
                           WebkitLineClamp: 2,
@@ -182,8 +197,8 @@ export default function HackathonDashboard() {
                         style={{
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '0.5rem',
-                          background: 'rgba(15, 23, 42, 0.5)',
+                          gap: '0.55rem',
+                          background: 'var(--brand-pale-green)',
                           padding: '0.85rem 1rem',
                           borderRadius: 'var(--radius-md)',
                           fontSize: '0.84rem',
@@ -191,25 +206,25 @@ export default function HackathonDashboard() {
                           border: '1px solid var(--border-subtle)'
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                          <Calendar size={15} style={{ color: 'var(--primary-400)' }} />
-                          <span>Dates: <strong style={{ color: 'var(--text-primary)' }}>{formatDate(h.start_date)} – {formatDate(h.end_date)}</strong></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: 'var(--text-secondary)' }}>
+                          <Calendar size={15} style={{ color: 'var(--brand-forest)', flexShrink: 0 }} />
+                          <span>Dates: <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(h.start_date)} – {formatDate(h.end_date)}</strong></span>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                          <Clock size={15} style={{ color: 'var(--accent-amber)' }} />
-                          <span>Deadline: <strong style={{ color: 'var(--text-primary)' }}>{formatDate(h.registration_deadline)}</strong></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: 'var(--text-secondary)' }}>
+                          <Clock size={15} style={{ color: 'var(--brand-soft-gold)', flexShrink: 0 }} />
+                          <span>Deadline: <strong style={{ color: 'var(--brand-navy)' }}>{formatDate(h.registration_deadline)}</strong></span>
                         </div>
 
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                          <Users size={15} style={{ color: 'var(--accent-cyan)' }} />
-                          <span>Team Size: <strong style={{ color: 'var(--text-primary)' }}>{h.min_team_size}–{h.max_team_size} Members</strong></span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: 'var(--text-secondary)' }}>
+                          <Users size={15} style={{ color: 'var(--brand-forest)', flexShrink: 0 }} />
+                          <span>Team Size: <strong style={{ color: 'var(--brand-navy)' }}>{h.min_team_size}–{h.max_team_size} Members</strong></span>
                         </div>
 
                         {h.location && (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-secondary)' }}>
-                            <MapPin size={15} style={{ color: 'var(--accent-rose)' }} />
-                            <span>Location: <strong style={{ color: 'var(--text-primary)' }}>{h.location}</strong></span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', color: 'var(--text-secondary)' }}>
+                            <MapPin size={15} style={{ color: 'var(--accent-rose)', flexShrink: 0 }} />
+                            <span>Location: <strong style={{ color: 'var(--brand-navy)' }}>{h.location}</strong></span>
                           </div>
                         )}
                       </div>

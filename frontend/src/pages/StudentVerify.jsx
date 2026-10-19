@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStudentAuth } from '../context/StudentAuthContext';
 import { api } from '../services/api';
-import { Layers, ArrowRight, ShieldAlert, CheckCircle2, Loader2 } from 'lucide-react';
+import { Layers, ArrowRight, ShieldAlert, CheckCircle2, Loader2, Sparkles } from 'lucide-react';
 
 export default function StudentVerify() {
   const [registerNumber, setRegisterNumber] = useState('');
@@ -69,25 +69,26 @@ export default function StudentVerify() {
         alignItems: 'center',
         justifyContent: 'center',
         padding: '1.5rem',
-        position: 'relative'
+        position: 'relative',
+        background: 'var(--bg-primary)'
       }}
     >
-      {/* Background Glows */}
+      {/* Background Soft Glow */}
       <div
         style={{
           position: 'absolute',
-          top: '20%',
+          top: '25%',
           left: '50%',
           transform: 'translateX(-50%)',
-          width: '500px',
+          width: '450px',
           height: '350px',
-          background: 'radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(120, 157, 141, 0.15) 0%, transparent 70%)',
           pointerEvents: 'none',
           filter: 'blur(50px)'
         }}
       />
 
-      <div style={{ maxWidth: '480px', width: '100%', position: 'relative', zIndex: 10 }}>
+      <div style={{ maxWidth: '460px', width: '100%', position: 'relative', zIndex: 10 }}>
         {/* Header Branding */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
           <div
@@ -100,7 +101,7 @@ export default function StudentVerify() {
               alignItems: 'center',
               justifyContent: 'center',
               margin: '0 auto 1.25rem',
-              boxShadow: '0 8px 24px rgba(79, 70, 229, 0.45)'
+              boxShadow: '0 4px 16px rgba(80, 121, 104, 0.35)'
             }}
           >
             <Layers size={32} color="#ffffff" />
@@ -108,20 +109,30 @@ export default function StudentVerify() {
 
           <h1
             style={{
-              fontSize: '2.1rem',
+              fontSize: '2.25rem',
               fontWeight: 800,
               letterSpacing: '-0.025em',
-              marginBottom: '0.5rem',
-              background: 'linear-gradient(180deg, #ffffff 0%, #cbd5e1 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent'
+              marginBottom: '0.35rem',
+              color: 'var(--brand-navy)'
             }}
           >
-            Student Screenshot Portal
+            EVIDERA
           </h1>
 
-          <p style={{ color: 'var(--text-secondary)', fontSize: '0.98rem' }}>
-            Register for hackathons and upload your registration proof
+          <div
+            style={{
+              fontSize: '0.98rem',
+              fontWeight: 600,
+              color: 'var(--brand-forest)',
+              letterSpacing: '0.01em',
+              marginBottom: '0.5rem'
+            }}
+          >
+            Every Milestone Matters.
+          </div>
+
+          <p style={{ color: 'var(--text-secondary)', fontSize: '0.92rem' }}>
+            College Hackathon Registration & Milestone Verification Portal
           </p>
         </div>
 
@@ -134,12 +145,13 @@ export default function StudentVerify() {
                   width: '56px',
                   height: '56px',
                   borderRadius: '50%',
-                  background: 'rgba(16, 185, 129, 0.15)',
+                  background: 'var(--brand-sage-light)',
                   color: 'var(--accent-emerald)',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  margin: '0 auto 1rem'
+                  margin: '0 auto 1rem',
+                  border: '1px solid #bce1ce'
                 }}
               >
                 <CheckCircle2 size={32} />
@@ -147,7 +159,7 @@ export default function StudentVerify() {
               <h3 style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-emerald)', marginBottom: '0.35rem' }}>
                 Student verified successfully.
               </h3>
-              <p style={{ color: 'var(--text-primary)', fontSize: '1.05rem', fontWeight: 600 }}>
+              <p style={{ color: 'var(--brand-navy)', fontSize: '1.05rem', fontWeight: 700 }}>
                 Welcome, {welcomeStudent.name}
               </p>
               <div
@@ -155,7 +167,7 @@ export default function StudentVerify() {
                   marginTop: '0.75rem',
                   display: 'inline-flex',
                   gap: '0.5rem',
-                  fontSize: '0.82rem',
+                  fontSize: '0.84rem',
                   color: 'var(--text-muted)'
                 }}
               >
@@ -163,7 +175,7 @@ export default function StudentVerify() {
                 <span>•</span>
                 <span>Year: <strong style={{ color: 'var(--text-secondary)' }}>{welcomeStudent.year}</strong></span>
               </div>
-              <div style={{ marginTop: '1.5rem', color: 'var(--primary-400)', fontSize: '0.85rem' }}>
+              <div style={{ marginTop: '1.5rem', color: 'var(--brand-forest)', fontSize: '0.85rem', fontWeight: 600 }}>
                 Redirecting to Hackathons dashboard...
               </div>
             </div>
@@ -173,7 +185,7 @@ export default function StudentVerify() {
                 <label
                   htmlFor="register-number-input"
                   className="form-label"
-                  style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.6rem' }}
+                  style={{ fontSize: '0.92rem', fontWeight: 700, color: 'var(--brand-navy)', marginBottom: '0.6rem' }}
                 >
                   Enter Register Number
                 </label>

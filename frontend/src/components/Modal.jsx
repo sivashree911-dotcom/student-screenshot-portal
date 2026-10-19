@@ -18,15 +18,16 @@ export default function Modal({ isOpen, onClose, title, children, footer, maxWid
     <div className="modal-overlay" onClick={onClose}>
       <div
         className="modal-container"
-        style={{ maxWidth }}
+        style={{ maxWidth, width: '100%' }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">
-          <h3 style={{ fontSize: '1.2rem', fontWeight: 700 }}>{title}</h3>
+          <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--brand-navy)' }}>{title}</h3>
           <button
             onClick={onClose}
             className="btn btn-secondary btn-sm"
-            style={{ padding: '0.35rem', borderRadius: '50%', border: 'none' }}
+            style={{ padding: '0.35rem', borderRadius: '50%', border: 'none', cursor: 'pointer' }}
+            aria-label="Close dialog"
           >
             <X size={18} />
           </button>

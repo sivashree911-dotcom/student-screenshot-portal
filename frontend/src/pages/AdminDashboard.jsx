@@ -218,24 +218,24 @@ export default function AdminDashboard() {
         ) : hackathonPartData ? (
           <div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <div style={{ background: 'var(--brand-pale-green)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
                 <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600 }}>TOTAL STUDENTS</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#ffffff' }}>{hackathonPartData.summary?.totalStudents || 0}</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{hackathonPartData.summary?.totalStudents || 0}</div>
               </div>
 
-              <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+              <div style={{ background: 'var(--brand-sage-light)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid #bce1ce' }}>
                 <div style={{ fontSize: '0.78rem', color: 'var(--accent-emerald)', fontWeight: 600 }}>PARTICIPATED</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-emerald)' }}>{hackathonPartData.summary?.participatedCount || 0}</div>
               </div>
 
-              <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.25)' }}>
+              <div style={{ background: '#FDF2F2', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid #f7c7c7' }}>
                 <div style={{ fontSize: '0.78rem', color: 'var(--accent-rose)', fontWeight: 600 }}>NOT PARTICIPATED</div>
                 <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-rose)' }}>{hackathonPartData.summary?.notParticipatedCount || 0}</div>
               </div>
 
-              <div style={{ background: 'rgba(99, 102, 241, 0.08)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(99, 102, 241, 0.25)' }}>
-                <div style={{ fontSize: '0.78rem', color: 'var(--primary-400)', fontWeight: 600 }}>PARTICIPATION RATE</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--primary-400)' }}>{hackathonPartData.summary?.participationRate || 0}%</div>
+              <div style={{ background: 'var(--brand-pale-gold)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid #f6deb2' }}>
+                <div style={{ fontSize: '0.78rem', color: '#925c0e', fontWeight: 600 }}>PARTICIPATION RATE</div>
+                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: '#925c0e' }}>{hackathonPartData.summary?.participationRate || 0}%</div>
               </div>
             </div>
 
@@ -243,9 +243,9 @@ export default function AdminDashboard() {
             <div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.82rem', marginBottom: '0.4rem' }}>
                 <span style={{ color: 'var(--text-secondary)' }}>Participation Progress</span>
-                <span style={{ fontWeight: 700, color: '#ffffff' }}>{hackathonPartData.summary?.participationRate || 0}%</span>
+                <span style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{hackathonPartData.summary?.participationRate || 0}%</span>
               </div>
-              <div style={{ height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
+              <div style={{ height: '8px', background: 'var(--border-subtle)', borderRadius: 'var(--radius-full)', overflow: 'hidden' }}>
                 <div
                   style={{
                     height: '100%',
@@ -346,10 +346,10 @@ export default function AdminDashboard() {
         >
           <div>
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontSize: '0.8rem', color: 'var(--primary-400)', fontWeight: 700 }}>{selectedSub.hackathon_institution}</div>
-              <h3 style={{ fontSize: '1.3rem', fontWeight: 800 }}>{selectedSub.hackathon_name}</h3>
+              <div style={{ fontSize: '0.8rem', color: 'var(--brand-forest)', fontWeight: 700 }}>{selectedSub.hackathon_institution}</div>
+              <h3 style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{selectedSub.hackathon_name}</h3>
               <div style={{ marginTop: '0.35rem', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                Submitted by: <strong className="font-mono" style={{ color: '#ffffff' }}>{selectedSub.student_register_number}</strong> on {formatDate(selectedSub.created_at)}
+                Submitted by: <strong className="font-mono" style={{ color: 'var(--brand-navy)' }}>{selectedSub.student_register_number}</strong> on {formatDate(selectedSub.created_at)}
               </div>
             </div>
 
@@ -368,33 +368,33 @@ export default function AdminDashboard() {
               <div
                 style={{
                   marginBottom: '1.25rem',
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  background: 'var(--brand-pale-gold)',
+                  border: '1px solid #f6deb2',
                   borderRadius: 'var(--radius-md)',
                   padding: '0.85rem 1.1rem',
                   fontSize: '0.88rem'
                 }}
               >
-                <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ fontWeight: 700, color: '#925c0e', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Clock size={15} />
                   <span>Corrected Resubmission (Previously Rejected)</span>
                 </div>
                 <div style={{ color: 'var(--text-secondary)' }}>
-                  Prior rejection feedback: <span style={{ color: '#ffffff' }}>"{selectedSub.previous_rejection_reason}"</span>
+                  Prior rejection feedback: <span style={{ color: 'var(--brand-navy)', fontWeight: 600 }}>"{selectedSub.previous_rejection_reason}"</span>
                 </div>
               </div>
             )}
 
             {/* Team Members */}
             <div style={{ marginBottom: '1.25rem' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>
                 Team Members ({selectedSub.team_members?.length || 0}):
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 {selectedSub.team_members?.map((m, i) => (
-                  <div key={i} style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
+                  <div key={i} style={{ background: 'var(--brand-pale-green)', border: '1px solid var(--border-subtle)', padding: '0.55rem 0.85rem', borderRadius: 'var(--radius-sm)', display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
                     <div>
-                      <strong>{m.name}</strong> {m.register_number ? `(${m.register_number})` : ''} {m.department ? `• ${m.department}` : ''}
+                      <strong style={{ color: 'var(--brand-navy)' }}>{m.name}</strong> {m.register_number ? `(${m.register_number})` : ''} {m.department ? `• ${m.department}` : ''}
                     </div>
                     <span className={`badge ${m.is_captain ? 'badge-college' : m.member_type === 'External' ? 'badge-external' : 'badge-college'}`} style={{ fontSize: '0.7rem' }}>
                       {m.is_captain ? 'Captain' : m.member_type}
@@ -408,7 +408,7 @@ export default function AdminDashboard() {
             {selectedSub.screenshot_path && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--text-secondary)' }}>Proof Screenshot:</div>
+                  <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--brand-navy)' }}>Proof Screenshot:</div>
                   <a
                     href={
                       selectedSub.screenshot_path.startsWith('http://') ||
@@ -425,7 +425,7 @@ export default function AdminDashboard() {
                     <span>Open Fullscreen</span>
                   </a>
                 </div>
-                <div style={{ background: '#000', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ background: '#ffffff', borderRadius: 'var(--radius-md)', overflow: 'hidden', maxHeight: '300px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid var(--border-subtle)', padding: '0.5rem' }}>
                   <img
                     src={
                       selectedSub.screenshot_path.startsWith('http://') ||
@@ -434,7 +434,7 @@ export default function AdminDashboard() {
                         : `/uploads/screenshots/${selectedSub.screenshot_path}`
                     }
                     alt="Proof"
-                    style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
+                    style={{ maxWidth: '100%', maxHeight: '290px', objectFit: 'contain' }}
                   />
                 </div>
               </div>

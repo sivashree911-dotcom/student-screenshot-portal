@@ -136,12 +136,12 @@ export default function AdminTeams() {
               <tbody>
                 {teams.map((t) => (
                   <tr key={t.team_id}>
-                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-400)' }}>
+                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-forest)' }}>
                       T-{String(t.team_id).padStart(4, '0')}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{t.hackathon_name}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{t.hackathon_name}</td>
                     <td>
-                      <strong>{t.captain?.name || 'Captain'}</strong>
+                      <strong style={{ color: 'var(--brand-navy)' }}>{t.captain?.name || 'Captain'}</strong>
                       {t.captain?.register_number && (
                         <div className="font-mono text-muted" style={{ fontSize: '0.8rem' }}>
                           {t.captain.register_number}
@@ -188,15 +188,15 @@ export default function AdminTeams() {
         >
           <div>
             <div style={{ marginBottom: '1.25rem' }}>
-              <h3 style={{ fontSize: '1.25rem', fontWeight: 800 }}>{selectedTeam.hackathon_name}</h3>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{selectedTeam.hackathon_name}</h3>
               <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                Submission ID: <span className="font-mono text-primary" style={{ fontWeight: 700 }}>{selectedTeam.submission_id}</span> • Status: <span className={`badge ${selectedTeam.submission_status === 'Verified' ? 'badge-verified' : selectedTeam.submission_status === 'Rejected' ? 'badge-rejected' : 'badge-pending'}`}>{selectedTeam.submission_status}</span>
+                Submission ID: <span className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-forest)' }}>{selectedTeam.submission_id}</span> • Status: <span className={`badge ${selectedTeam.submission_status === 'Verified' ? 'badge-verified' : selectedTeam.submission_status === 'Rejected' ? 'badge-rejected' : 'badge-pending'}`}>{selectedTeam.submission_status}</span>
               </div>
             </div>
 
             {/* Members Roster */}
             <div style={{ marginBottom: '1.5rem' }}>
-              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--text-secondary)' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', color: 'var(--brand-navy)' }}>
                 Team Members ({selectedTeam.members?.length || 0}):
               </h4>
 
@@ -205,7 +205,8 @@ export default function AdminTeams() {
                   <div
                     key={m.id || i}
                     style={{
-                      background: 'rgba(15, 23, 42, 0.7)',
+                      background: 'var(--brand-pale-green)',
+                      border: '1px solid var(--border-subtle)',
                       padding: '0.75rem 1rem',
                       borderRadius: 'var(--radius-md)',
                       display: 'flex',
@@ -215,7 +216,7 @@ export default function AdminTeams() {
                     }}
                   >
                     <div>
-                      <strong style={{ color: '#ffffff' }}>{m.name}</strong>
+                      <strong style={{ color: 'var(--brand-navy)' }}>{m.name}</strong>
                       {m.register_number && (
                         <span className="font-mono text-muted" style={{ marginLeft: '0.5rem' }}>
                           ({m.register_number})

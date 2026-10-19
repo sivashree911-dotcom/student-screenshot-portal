@@ -147,10 +147,10 @@ export default function AdminStudents() {
               <tbody>
                 {students.map((st, i) => (
                   <tr key={st.registerNumber || i}>
-                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-400)' }}>
+                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-forest)' }}>
                       {st.registerNumber}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{st.name}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{st.name}</td>
                     <td className="font-mono text-muted" style={{ fontSize: '0.84rem' }}>{st.email || '-'}</td>
                     <td><span className="badge badge-college">{st.department}</span></td>
                     <td>Year {st.year}</td>

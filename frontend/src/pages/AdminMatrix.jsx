@@ -131,10 +131,10 @@ export default function AdminMatrix() {
               <tbody>
                 {filteredMatrix.map((st) => (
                   <tr key={st.registerNumber}>
-                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--primary-400)' }}>
+                    <td className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-forest)' }}>
                       {st.registerNumber}
                     </td>
-                    <td style={{ fontWeight: 600 }}>{st.name}</td>
+                    <td style={{ fontWeight: 600, color: 'var(--brand-navy)' }}>{st.name}</td>
                     <td><span className="badge badge-college">{st.department}</span></td>
                     <td>Yr {st.year}</td>
                     <td style={{ textAlign: 'center' }}>

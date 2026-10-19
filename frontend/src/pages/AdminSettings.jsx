@@ -152,22 +152,22 @@ export default function AdminSettings() {
           </h2>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-            <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--brand-pale-green)', border: '1px solid var(--border-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <Database size={18} color="var(--accent-cyan)" />
+                <Database size={18} color="var(--brand-forest)" />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Database Connection</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--brand-navy)' }}>Database Connection</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>MySQL / Relational Engine</div>
                 </div>
               </div>
               <span className="badge badge-active">{healthData?.database || 'Connected'}</span>
             </div>
 
-            <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--brand-pale-green)', border: '1px solid var(--border-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <FileSpreadsheet size={18} color="var(--accent-emerald)" />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Google Apps Script API</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--brand-navy)' }}>Google Apps Script API</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Live Student Verification</div>
                 </div>
               </div>
@@ -176,11 +176,11 @@ export default function AdminSettings() {
               </span>
             </div>
 
-            <div style={{ background: 'rgba(15, 23, 42, 0.7)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div style={{ background: 'var(--brand-pale-green)', border: '1px solid var(--border-subtle)', padding: '1rem', borderRadius: 'var(--radius-md)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-                <ShieldCheck size={18} color="var(--accent-amber)" />
+                <ShieldCheck size={18} color="var(--brand-soft-gold)" />
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: '0.9rem' }}>Authentication Protocol</div>
+                  <div style={{ fontWeight: 600, fontSize: '0.9rem', color: 'var(--brand-navy)' }}>Authentication Protocol</div>
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>JWT / Bcrypt Encryption</div>
                 </div>
               </div>

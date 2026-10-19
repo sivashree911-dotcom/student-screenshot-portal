@@ -261,10 +261,10 @@ export default function AdminSubmissions() {
             {/* Header info */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1.25rem' }}>
               <div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--primary-400)', fontWeight: 700 }}>{selectedSub.hackathon_institution}</div>
-                <h3 style={{ fontSize: '1.35rem', fontWeight: 800 }}>{selectedSub.hackathon_name}</h3>
+                <div style={{ fontSize: '0.8rem', color: 'var(--brand-forest)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{selectedSub.hackathon_institution}</div>
+                <h3 style={{ fontSize: '1.35rem', fontWeight: 800, color: 'var(--brand-navy)' }}>{selectedSub.hackathon_name}</h3>
                 <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginTop: '0.25rem' }}>
-                  Submitted on {formatDate(selectedSub.created_at)} by <strong className="font-mono" style={{ color: '#ffffff' }}>{selectedSub.student_register_number}</strong>
+                  Submitted on {formatDate(selectedSub.created_at)} by <strong className="font-mono" style={{ color: 'var(--brand-navy)' }}>{selectedSub.student_register_number}</strong>
                 </div>
               </div>
 
@@ -288,26 +288,26 @@ export default function AdminSubmissions() {
               <div
                 style={{
                   marginBottom: '1.25rem',
-                  background: 'rgba(245, 158, 11, 0.08)',
-                  border: '1px solid rgba(245, 158, 11, 0.3)',
+                  background: 'var(--brand-pale-gold)',
+                  border: '1px solid #f6deb2',
                   borderRadius: 'var(--radius-md)',
                   padding: '0.85rem 1.1rem',
                   fontSize: '0.88rem'
                 }}
               >
-                <div style={{ fontWeight: 700, color: 'var(--accent-amber)', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <div style={{ fontWeight: 700, color: '#925c0e', marginBottom: '0.2rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
                   <Clock size={15} />
                   <span>Corrected Resubmission (Previously Rejected)</span>
                 </div>
                 <div style={{ color: 'var(--text-secondary)' }}>
-                  Prior rejection feedback: <span style={{ color: '#ffffff' }}>"{selectedSub.previous_rejection_reason}"</span>
+                  Prior rejection feedback: <span style={{ color: 'var(--brand-navy)', fontWeight: 600 }}>"{selectedSub.previous_rejection_reason}"</span>
                 </div>
               </div>
             )}
 
             {/* Team Breakdown */}
             <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--text-secondary)' }}>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', marginBottom: '0.5rem', color: 'var(--brand-navy)' }}>
                 Team Composition ({selectedSub.team_members?.length || 0} Members):
               </div>
 
@@ -316,7 +316,8 @@ export default function AdminSubmissions() {
                   <div
                     key={m.id || i}
                     style={{
-                      background: 'rgba(15, 23, 42, 0.7)',
+                      background: 'var(--brand-pale-green)',
+                      border: '1px solid var(--border-subtle)',
                       padding: '0.65rem 0.85rem',
                       borderRadius: 'var(--radius-md)',
                       display: 'flex',
@@ -326,12 +327,12 @@ export default function AdminSubmissions() {
                     }}
                   >
                     <div>
-                      <strong style={{ color: '#ffffff' }}>{m.name}</strong>
+                      <strong style={{ color: 'var(--brand-navy)' }}>{m.name}</strong>
                       <span className="font-mono text-muted" style={{ marginLeft: '0.5rem' }}>
                         {m.register_number ? `(${m.register_number})` : ''}
                       </span>
                       {m.department && <span style={{ color: 'var(--text-muted)', marginLeft: '0.5rem' }}>• {m.department} (Yr {m.year})</span>}
-                      {m.institution && m.institution !== 'College' && <span style={{ color: 'var(--accent-amber)', marginLeft: '0.5rem' }}>• {m.institution}</span>}
+                      {m.institution && m.institution !== 'College' && <span style={{ color: 'var(--brand-soft-gold)', marginLeft: '0.5rem', fontWeight: 600 }}>• {m.institution}</span>}
                     </div>
 
                     <span className={`badge ${m.is_captain ? 'badge-college' : m.member_type === 'External' ? 'badge-external' : 'badge-college'}`} style={{ fontSize: '0.72rem' }}>
@@ -346,7 +347,7 @@ export default function AdminSubmissions() {
             {selectedSub.screenshot_path && (
               <div style={{ marginBottom: '1.5rem' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--brand-navy)' }}>
                     Uploaded Proof Screenshot:
                   </div>
                   <a
@@ -368,14 +369,15 @@ export default function AdminSubmissions() {
 
                 <div
                   style={{
-                    background: '#000',
+                    background: '#ffffff',
                     borderRadius: 'var(--radius-md)',
                     overflow: 'hidden',
                     maxHeight: '360px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    border: '1px solid var(--border-subtle)'
+                    border: '1px solid var(--border-subtle)',
+                    padding: '0.5rem'
                   }}
                 >
                   <img

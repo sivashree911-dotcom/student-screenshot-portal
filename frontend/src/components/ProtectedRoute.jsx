@@ -2,14 +2,16 @@ import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { useStudentAuth } from '../context/StudentAuthContext';
 import { useAdminAuth } from '../context/AdminAuthContext';
+import { Loader2 } from 'lucide-react';
 
 export function StudentRoute() {
   const { isAuthenticated, loading } = useStudentAuth();
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <div style={{ color: 'var(--primary-400)', fontWeight: 600 }}>Loading student portal...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '60vh', gap: '0.75rem' }}>
+        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--brand-forest)' }} />
+        <div style={{ color: 'var(--brand-forest)', fontWeight: 600, fontSize: '0.95rem' }}>Loading Evidera...</div>
       </div>
     );
   }
@@ -26,8 +28,9 @@ export function AdminRoute() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-primary)' }}>
-        <div style={{ color: 'var(--primary-400)', fontWeight: 600 }}>Verifying administrator session...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', background: 'var(--bg-primary)', gap: '0.75rem' }}>
+        <Loader2 size={28} className="animate-spin" style={{ color: 'var(--brand-forest)' }} />
+        <div style={{ color: 'var(--brand-forest)', fontWeight: 600, fontSize: '0.95rem' }}>Verifying administrator session...</div>
       </div>
     );
   }
