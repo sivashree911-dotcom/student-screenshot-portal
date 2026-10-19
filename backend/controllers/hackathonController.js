@@ -202,7 +202,9 @@ async function createHackathon(req, res, next) {
     let posterPath = null;
 
     if (req.file) {
-      posterPath = req.file.filename;
+      posterPath = (req.file.path && req.file.path.startsWith('http'))
+        ? req.file.path
+        : req.file.filename;
     }
 
     const result = await query(
@@ -297,11 +299,14 @@ async function updateHackathon(req, res, next) {
     let posterPath = existing[0].poster_path;
 
     if (req.file) {
-      posterPath = req.file.filename;
+      posterPath = (req.file.path && req.file.path.startsWith('http'))
+        ? req.file.path
+        : req.file.filename;
 
-      // Remove old poster if it was custom
+      // Remove old poster if it was custom and stored locally on disk
       if (
         existing[0].poster_path &&
+        !existing[0].poster_path.startsWith('http') &&
         !existing[0].poster_path.startsWith('poster_sample_')
       ) {
         const oldPath = path.join(
@@ -474,9 +479,10 @@ async function deleteHackathon(req, res, next) {
       [id]
     );
 
-    // Delete poster file if present
+    // Delete poster file if present on local disk
     if (
       existing[0].poster_path &&
+      !existing[0].poster_path.startsWith('http') &&
       !existing[0].poster_path.startsWith('poster_sample_')
     ) {
       const pPath = path.join(

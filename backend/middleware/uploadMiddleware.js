@@ -111,19 +111,45 @@ if (isCloudinaryConfigured) {
 }
 
 // ---------------------------------------------------------
-// LOCAL STORAGE — POSTERS
+// STORAGE — POSTERS
+// Cloudinary storage if configured (persistent across restarts),
+// otherwise falls back to local disk storage
 // ---------------------------------------------------------
-const posterStorage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, postersDir);
-  },
-  filename: function (req, file, cb) {
-    const ext = path.extname(file.originalname).toLowerCase();
-    const uniqueSuffix =
-      Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `poster-${uniqueSuffix}${ext}`);
+let posterStorage;
+
+if (isCloudinaryConfigured) {
+  posterStorage = new CloudinaryStorage({
+    cloudinary: cloudinary,
+    params: {
+      folder: 'student-screenshot-portal/posters',
+      resource_type: 'image',
+      allowed_formats: ['png', 'jpg', 'jpeg', 'webp'],
+      public_id: (req, file) => {
+        const uniqueSuffix =
+          Date.now() + '-' + Math.round(Math.random() * 1e9);
+        return `poster-${uniqueSuffix}`;
+      }
+    }
+  });
+} else {
+  if (config.nodeEnv === 'production') {
+    console.warn(
+      '⚠️ [POSTERS] Cloudinary credentials not configured in production. Using local disk storage fallback. Note: files stored on Render ephemeral disk will not persist across redeployments unless Cloudinary is configured or a persistent disk is attached.'
+    );
   }
-});
+
+  posterStorage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, postersDir);
+    },
+    filename: function (req, file, cb) {
+      const ext = path.extname(file.originalname).toLowerCase();
+      const uniqueSuffix =
+        Date.now() + '-' + Math.round(Math.random() * 1e9);
+      cb(null, `poster-${uniqueSuffix}${ext}`);
+    }
+  });
+}
 
 // ---------------------------------------------------------
 // Maximum file size: 5 MB

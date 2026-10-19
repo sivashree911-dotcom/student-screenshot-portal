@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { api } from '../services/api';
+import { api, getPosterUrl } from '../services/api';
 import Modal from '../components/Modal';
+import HackathonPoster from '../components/HackathonPoster';
 import {
   Trophy,
   Plus,
@@ -104,13 +105,7 @@ export default function AdminHackathons() {
       isActive: Boolean(h.is_active)
     });
     setPosterFile(null);
-    setPosterPreview(
-      h.poster_path
-        ? h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
-          ? h.poster_path
-          : `/uploads/posters/${h.poster_path}`
-        : null
-    );
+    setPosterPreview(getPosterUrl(h.poster_path));
     setFormError(null);
     setIsModalOpen(true);
   };
@@ -227,34 +222,12 @@ export default function AdminHackathons() {
               }}
             >
               {/* Poster Preview */}
-              <div
-                style={{
-                  height: '160px',
-                  background: 'linear-gradient(135deg, #E8F0EB 0%, #d4e5db 100%)',
-                  position: 'relative',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  overflow: 'hidden'
-                }}
+              <HackathonPoster
+                posterPath={h.poster_path}
+                name={h.name}
+                institution={h.institution}
+                height="160px"
               >
-                {h.poster_path ? (
-                  <img
-                    src={
-                      h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
-                        ? h.poster_path
-                        : `/uploads/posters/${h.poster_path}`
-                    }
-                    alt={h.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  <div style={{ color: 'var(--brand-forest)', textAlign: 'center' }}>
-                    <Trophy size={36} style={{ margin: '0 auto 0.25rem' }} />
-                    <span style={{ fontSize: '0.8rem', fontWeight: 600 }}>No Poster Attached</span>
-                  </div>
-                )}
-
                 <div style={{ position: 'absolute', top: '10px', left: '10px' }}>
                   <span className={`badge ${h.is_active ? 'badge-active' : 'badge-inactive'}`}>
                     {h.is_active ? 'Active' : 'Inactive'}
@@ -264,7 +237,7 @@ export default function AdminHackathons() {
                 <div style={{ position: 'absolute', top: '10px', right: '10px' }}>
                   <span className="badge badge-college">{h.mode}</span>
                 </div>
-              </div>
+              </HackathonPoster>
 
               {/* Card Body */}
               <div style={{ padding: '1.25rem' }}>
@@ -473,7 +446,19 @@ export default function AdminHackathons() {
                 />
                 {posterPreview && (
                   <div style={{ marginTop: '0.75rem', maxHeight: '160px', overflow: 'hidden', borderRadius: 'var(--radius-md)', background: '#ffffff', border: '1px solid var(--border-subtle)', textAlign: 'center', padding: '0.5rem' }}>
-                    <img src={posterPreview} alt="Poster preview" style={{ maxHeight: '150px', width: 'auto', objectFit: 'contain' }} />
+                    <img
+                      src={posterPreview}
+                      alt="Poster preview"
+                      style={{ maxHeight: '150px', width: 'auto', objectFit: 'contain' }}
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                        const msg = document.getElementById('poster-preview-fallback');
+                        if (msg) msg.style.display = 'block';
+                      }}
+                    />
+                    <div id="poster-preview-fallback" style={{ display: 'none', padding: '0.5rem', fontSize: '0.8rem', color: 'var(--text-secondary)' }}>
+                      Current poster file is unavailable on server. Select a new file above to replace it.
+                    </div>
                   </div>
                 )}
               </div>

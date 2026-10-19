@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { api } from '../services/api';
+import HackathonPoster from '../components/HackathonPoster';
 import {
   Trophy,
   Calendar,
@@ -100,53 +101,25 @@ export default function HackathonDashboard() {
                 gap: '1.75rem'
               }}
             >
-              {hackathons.map((h) => {
-                const posterUrl = h.poster_path
-                  ? h.poster_path.startsWith('http://') || h.poster_path.startsWith('https://')
-                    ? h.poster_path
-                    : `/uploads/posters/${h.poster_path}`
-                  : null;
-
-                return (
-                  <div
-                    key={h.id}
-                    className="card card-hover"
-                    style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      padding: 0,
-                      overflow: 'hidden',
-                      borderRadius: 'var(--radius-xl)'
-                    }}
+              {hackathons.map((h) => (
+                <div
+                  key={h.id}
+                  className="card card-hover"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    padding: 0,
+                    overflow: 'hidden',
+                    borderRadius: 'var(--radius-xl)'
+                  }}
+                >
+                  {/* Poster Section */}
+                  <HackathonPoster
+                    posterPath={h.poster_path}
+                    name={h.name}
+                    institution={h.institution}
+                    height="190px"
                   >
-                    {/* Poster Section */}
-                    <div
-                      style={{
-                        height: '190px',
-                        background: 'linear-gradient(135deg, #E8F0EB 0%, #d4e5db 100%)',
-                        position: 'relative',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {posterUrl ? (
-                        <img
-                          src={posterUrl}
-                          alt={h.name}
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                          onError={(e) => {
-                            e.target.style.display = 'none';
-                          }}
-                        />
-                      ) : (
-                        <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--brand-forest)' }}>
-                          <Trophy size={40} style={{ margin: '0 auto 0.5rem' }} />
-                          <div style={{ fontSize: '0.9rem', fontWeight: 700 }}>{h.institution}</div>
-                        </div>
-                      )}
-
                       <div
                         style={{
                           position: 'absolute',
@@ -165,7 +138,7 @@ export default function HackathonDashboard() {
                       >
                         {h.mode}
                       </div>
-                    </div>
+                    </HackathonPoster>
 
                     {/* Content Section */}
                     <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -242,8 +215,7 @@ export default function HackathonDashboard() {
                       </div>
                     </div>
                   </div>
-                );
-              })}
+                ))}
             </div>
           )}
         </div>

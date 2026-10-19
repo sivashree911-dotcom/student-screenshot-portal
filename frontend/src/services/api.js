@@ -46,6 +46,61 @@ const API_BASE = configuredApiUrl
   ? (configuredApiUrl.endsWith('/api') ? configuredApiUrl : `${configuredApiUrl}/api`)
   : '/api';
 
+/**
+ * Safely constructs a valid, responsive image URL for hackathon posters
+ * across development and production environments.
+ *
+ * Handles:
+ * - Null / undefined / empty string safely (returns null)
+ * - Absolute Cloudinary HTTPS / external image URLs
+ * - Relative upload paths (avoiding duplicate path segments)
+ * - Normalizes Windows backslashes
+ * - Strips /api suffix from base URL if present
+ */
+export function getPosterUrl(posterPath) {
+  if (!posterPath || typeof posterPath !== 'string') return null;
+  const trimmed = posterPath.trim();
+  if (!trimmed || trimmed === 'null' || trimmed === 'undefined') return null;
+
+  // 1. Absolute URL (Cloudinary, HTTPS/HTTP, data URI)
+  if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('data:')) {
+    return trimmed;
+  }
+
+  // 2. Normalize Windows-style backslashes to forward slashes
+  const normalized = trimmed.replace(/\\/g, '/');
+
+  // 3. Resolve relative path without duplicate path segments
+  let cleanPath = normalized;
+  if (cleanPath.startsWith('/uploads/posters/')) {
+    // Already normalized relative path
+  } else if (cleanPath.startsWith('uploads/posters/')) {
+    cleanPath = `/${cleanPath}`;
+  } else if (cleanPath.startsWith('/uploads/')) {
+    cleanPath = cleanPath;
+  } else if (cleanPath.startsWith('uploads/')) {
+    cleanPath = `/${cleanPath}`;
+  } else if (cleanPath.startsWith('posters/')) {
+    cleanPath = `/uploads/${cleanPath}`;
+  } else if (cleanPath.startsWith('/posters/')) {
+    cleanPath = `/uploads${cleanPath}`;
+  } else {
+    // Pure filename e.g. "poster-1792308176831-669869020.jpeg"
+    cleanPath = `/uploads/posters/${cleanPath.replace(/^\/+/, '')}`;
+  }
+
+  // 4. Prepend base origin only if frontend is hosted separately from backend
+  const baseUrl = getApiBaseUrl();
+  if (baseUrl) {
+    // Strip trailing slash and any trailing /api segment so we don't produce /api/uploads
+    const origin = baseUrl.replace(/\/+$/, '').replace(/\/api$/, '');
+    return `${origin}${cleanPath}`;
+  }
+
+  return cleanPath;
+}
+
+
 async function request(endpoint, options = {}) {
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   const url = `${API_BASE}${cleanEndpoint}`;

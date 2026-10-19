@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import FileUpload from '../components/FileUpload';
 import { useStudentAuth } from '../context/StudentAuthContext';
-import { api } from '../services/api';
+import { api, getPosterUrl } from '../services/api';
 import confetti from 'canvas-confetti';
 import {
   Trophy,
@@ -488,14 +488,11 @@ export default function HackathonDetailSubmission() {
                     }}
                   >
                     <img
-                      src={
-                        hackathon.poster_path.startsWith('http://') || hackathon.poster_path.startsWith('https://')
-                          ? hackathon.poster_path
-                          : `/uploads/posters/${hackathon.poster_path}`
-                      }
+                      src={getPosterUrl(hackathon.poster_path)}
                       alt={hackathon.name}
                       style={{ width: '100%', maxHeight: '260px', objectFit: 'cover' }}
                       onError={(e) => {
+                        console.warn(`[Evidera Poster] Image failed to load for "${hackathon.name}":`, getPosterUrl(hackathon.poster_path));
                         e.target.parentElement.style.display = 'none';
                       }}
                     />
