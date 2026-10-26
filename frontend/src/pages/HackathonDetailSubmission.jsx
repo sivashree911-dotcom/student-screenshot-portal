@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import FileUpload from '../components/FileUpload';
@@ -22,7 +22,8 @@ import {
   Sparkles,
   FileCheck2,
   Loader2,
-  Info
+  Info,
+  RotateCcw
 } from 'lucide-react';
 
 export default function HackathonDetailSubmission() {
@@ -44,7 +45,18 @@ export default function HackathonDetailSubmission() {
   // Team State
   const [teamSize, setTeamSize] = useState(1);
   const [members, setMembers] = useState([]);
-  const [memberLookups, setMemberLookups] = useState({}); // index -> { loading, data, error }
+  const [memberLookups, setMemberLookups] = useState({}); // index -> { loading, data, error, isServiceError, requestId }
+
+  // Refs for debouncing and sequence tracking (preventing stale out-of-order responses)
+  const lookupDebounceTimers = useRef({});
+  const lookupRequestIds = useRef({});
+
+  // Cleanup pending debounce timers on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(lookupDebounceTimers.current).forEach(clearTimeout);
+    };
+  }, []);
 
   // Submission State
   const [submitting, setSubmitting] = useState(false);
@@ -183,79 +195,240 @@ export default function HackathonDetailSubmission() {
     });
   };
 
-  // Member register number lookup
-  const handleMemberRegChange = async (index, regNo) => {
-    const trimmed = regNo.trim().toUpperCase();
+  // Perform student verification request with stale request prevention
+  const performMemberLookup = async (index, trimmedRegNo, reqId) => {
+    // If request is already superseded, do not execute
+    if (lookupRequestIds.current[index] !== reqId) return;
 
-    const updated = [...members];
-    updated[index].registerNumber = trimmed;
-    // Clear previous verified data until re-verified
+    try {
+      const res = await api.post('/students/lookup', { registerNumber: trimmedRegNo });
+
+      // Stale check after await
+      if (lookupRequestIds.current[index] !== reqId) return;
+
+      if (res.success && res.student) {
+        const verifiedStudent = res.student;
+
+        setMembers((prevMembers) => {
+          const next = [...prevMembers];
+          if (next[index] && next[index].memberType === 'College') {
+            next[index] = {
+              ...next[index],
+              name: verifiedStudent.name,
+              department: verifiedStudent.department,
+              year: verifiedStudent.year,
+              section: verifiedStudent.section,
+              email: verifiedStudent.email || ''
+            };
+          }
+          return next;
+        });
+
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: verifiedStudent,
+            error: null,
+            isServiceError: false,
+            requestId: reqId
+          }
+        }));
+      } else {
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: 'This register number was not found in the approved student list. Please check the entered number.',
+            isServiceError: false,
+            requestId: reqId
+          }
+        }));
+      }
+    } catch (err) {
+      if (lookupRequestIds.current[index] !== reqId) return;
+
+      if (err.isNetworkError || err.status === 503) {
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: 'Unable to verify right now. Please try again.',
+            isServiceError: true,
+            requestId: reqId
+          }
+        }));
+      } else if (err.status === 404) {
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: 'This register number was not found in the approved student list. Please check the entered number.',
+            isServiceError: false,
+            requestId: reqId
+          }
+        }));
+      } else {
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: err.message || 'Unable to verify right now. Please try again.',
+            isServiceError: true,
+            requestId: reqId
+          }
+        }));
+      }
+    }
+  };
+
+  // Member register number lookup with debouncing and instant clear
+  const handleMemberRegChange = (index, regNo) => {
+    const rawVal = regNo;
+    const trimmed = rawVal.trim().toUpperCase();
+
+    // Immediately clear previously verified details while typing
+    setMembers((prev) => {
+      const updated = [...prev];
+      if (updated[index]) {
+        updated[index] = {
+          ...updated[index],
+          registerNumber: rawVal,
+          name: '',
+          department: '',
+          year: '',
+          section: '',
+          email: ''
+        };
+      }
+      return updated;
+    });
+
+    // Clear any existing debounce timer for this member
+    if (lookupDebounceTimers.current[index]) {
+      clearTimeout(lookupDebounceTimers.current[index]);
+    }
+
+    // Increment request ID to cancel any in-flight stale requests
+    lookupRequestIds.current[index] = (lookupRequestIds.current[index] || 0) + 1;
+    const currentReqId = lookupRequestIds.current[index];
+
+    // Empty input: reset to normal required-field state without API call
     if (!trimmed) {
-      updated[index].name = '';
-      updated[index].department = '';
-      updated[index].year = '';
-      setMembers(updated);
       setMemberLookups((prev) => ({ ...prev, [index]: null }));
       return;
     }
 
-    setMembers(updated);
+    // Captain duplicate check
+    const captainRegUpper = (student?.registerNumber || '').toString().trim().toUpperCase();
+    if (captainRegUpper && trimmed === captainRegUpper) {
+      setMemberLookups((prev) => ({
+        ...prev,
+        [index]: {
+          loading: false,
+          data: null,
+          error: 'Team captain cannot be added as another member.',
+          isServiceError: false,
+          requestId: currentReqId
+        }
+      }));
+      return;
+    }
 
-    // Duplicate check
+    // Teammate duplicate check
     const isDuplicate = members.some(
-      (m, idx) => idx !== index && m.registerNumber && m.registerNumber.toUpperCase() === trimmed
+      (m, idx) => idx !== index && m.registerNumber && m.registerNumber.toString().trim().toUpperCase() === trimmed
     );
 
     if (isDuplicate) {
       setMemberLookups((prev) => ({
         ...prev,
-        [index]: { error: 'This student is already part of the team.' }
+        [index]: {
+          loading: false,
+          data: null,
+          error: 'This student is already part of the team.',
+          isServiceError: false,
+          requestId: currentReqId
+        }
       }));
       return;
     }
 
-    // Lookup student
-    setMemberLookups((prev) => ({ ...prev, [index]: { loading: true } }));
-
-    try {
-      const res = await api.post('/students/lookup', { registerNumber: trimmed });
-      if (res.success && res.student) {
-        const verifiedStudent = res.student;
-        const currentMembers = [...members];
-        currentMembers[index] = {
-          ...currentMembers[index],
-          name: verifiedStudent.name,
-          department: verifiedStudent.department,
-          year: verifiedStudent.year,
-          section: verifiedStudent.section,
-          email: verifiedStudent.email
-        };
-        setMembers(currentMembers);
-        setMemberLookups((prev) => ({ ...prev, [index]: { data: verifiedStudent } }));
+    // Mark as pending verification
+    setMemberLookups((prev) => ({
+      ...prev,
+      [index]: {
+        loading: true,
+        data: null,
+        error: null,
+        isServiceError: false,
+        requestId: currentReqId
       }
-    } catch (err) {
-      setMemberLookups((prev) => ({
-        ...prev,
-        [index]: { error: 'This register number is not in the approved student list.' }
-      }));
+    }));
+
+    // Debounce actual verification network request by 350ms
+    lookupDebounceTimers.current[index] = setTimeout(() => {
+      performMemberLookup(index, trimmed, currentReqId);
+    }, 350);
+  };
+
+  // Retry action for verification service failure
+  const handleRetryLookup = (index) => {
+    const mem = members[index];
+    if (!mem || !mem.registerNumber) return;
+    const trimmed = mem.registerNumber.trim().toUpperCase();
+    if (!trimmed) return;
+
+    if (lookupDebounceTimers.current[index]) {
+      clearTimeout(lookupDebounceTimers.current[index]);
     }
+
+    lookupRequestIds.current[index] = (lookupRequestIds.current[index] || 0) + 1;
+    const currentReqId = lookupRequestIds.current[index];
+
+    setMemberLookups((prev) => ({
+      ...prev,
+      [index]: {
+        loading: true,
+        data: null,
+        error: null,
+        isServiceError: false,
+        requestId: currentReqId
+      }
+    }));
+
+    performMemberLookup(index, trimmed, currentReqId);
   };
 
   // Toggle member type between College and External
   const handleToggleMemberType = (index, type) => {
-    const updated = [...members];
-    updated[index] = {
-      registerNumber: '',
-      name: '',
-      department: '',
-      year: '',
-      section: '',
-      memberType: type,
-      institution: type === 'College' ? 'College' : '',
-      email: '',
-      isCaptain: false
-    };
-    setMembers(updated);
+    if (lookupDebounceTimers.current[index]) {
+      clearTimeout(lookupDebounceTimers.current[index]);
+    }
+    lookupRequestIds.current[index] = (lookupRequestIds.current[index] || 0) + 1;
+
+    setMembers((prev) => {
+      const updated = [...prev];
+      if (updated[index]) {
+        updated[index] = {
+          registerNumber: '',
+          name: '',
+          department: '',
+          year: '',
+          section: '',
+          memberType: type,
+          institution: type === 'College' ? 'College' : '',
+          email: '',
+          isCaptain: false
+        };
+      }
+      return updated;
+    });
+
     setMemberLookups((prev) => ({ ...prev, [index]: null }));
   };
 
@@ -293,14 +466,28 @@ export default function HackathonDetailSubmission() {
       return;
     }
 
-    // Validate college members
+    // Validate members & prevent duplicates
+    const captainReg = (student?.registerNumber || '').toString().trim().toUpperCase();
+    const seenRegs = new Set();
+    if (captainReg) seenRegs.add(captainReg);
+
     for (let i = 1; i < members.length; i++) {
       const m = members[i];
       if (m.memberType === 'College') {
-        if (!m.registerNumber || !m.name) {
-          setError(`Please enter and verify a valid Register Number for Member ${i + 1}.`);
+        const reg = (m.registerNumber || '').toString().trim().toUpperCase();
+        if (!reg || !m.name) {
+          setError(`Please enter and verify an approved Register Number for Member ${i + 1}.`);
           return;
         }
+        if (reg === captainReg) {
+          setError(`Member ${i + 1} cannot have the same register number as the Team Captain.`);
+          return;
+        }
+        if (seenRegs.has(reg)) {
+          setError(`Duplicate register number (${reg}) found in Member ${i + 1}. Each team member must be unique.`);
+          return;
+        }
+        seenRegs.add(reg);
       } else if (m.memberType === 'External') {
         if (!m.name || !m.institution) {
           setError(`Please provide Full Name and Institution for External Member ${i + 1}.`);
@@ -896,25 +1083,25 @@ export default function HackathonDetailSubmission() {
                                 ) : member.memberType === 'College' ? (
                                   /* College Member Form */
                                   <div>
-                                    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(180px, 240px) 1fr', gap: '1rem', alignItems: 'flex-start' }}>
-                                      <div className="form-group" style={{ margin: 0 }}>
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', alignItems: 'flex-start' }}>
+                                      <div className="form-group" style={{ margin: 0, minWidth: 0 }}>
                                         <label className="form-label" style={{ fontSize: '0.82rem' }}>
                                           Register Number <span style={{ color: 'var(--accent-rose)' }}>*</span>
                                         </label>
                                         <input
                                           type="text"
-                                          className="form-input"
-                                          placeholder="e.g. 1301"
+                                          className="form-input font-mono"
+                                          placeholder="e.g. 95072512207"
                                           value={member.registerNumber}
                                           onChange={(e) => handleMemberRegChange(idx, e.target.value)}
-                                          style={{ padding: '0.6rem 0.85rem' }}
+                                          style={{ padding: '0.6rem 0.85rem', width: '100%' }}
                                         />
                                       </div>
 
                                       {/* Live Verification Badge / Info */}
-                                      <div>
+                                      <div style={{ minWidth: 0 }}>
                                         {lookup?.loading ? (
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--brand-forest)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', color: 'var(--brand-forest)', fontSize: '0.85rem', paddingTop: '1.75rem' }}>
                                             <Loader2 size={16} className="animate-spin" />
                                             <span>Verifying register number...</span>
                                           </div>
@@ -930,16 +1117,57 @@ export default function HackathonDetailSubmission() {
                                           >
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: 'var(--accent-emerald)', fontWeight: 700, fontSize: '0.85rem', marginBottom: '0.2rem' }}>
                                               <CheckCircle2 size={15} />
-                                              <span>Verified College Student</span>
+                                              <span>Verified Student</span>
                                             </div>
                                             <div style={{ fontSize: '0.88rem', color: 'var(--brand-navy)' }}>
-                                              <strong>{member.name}</strong> • {member.department} (Year {member.year})
+                                              <strong>{member.name}</strong>
+                                              {member.department && (
+                                                <span> • {member.department} {member.year ? `(Year ${member.year})` : ''}</span>
+                                              )}
                                             </div>
                                           </div>
                                         ) : lookup?.error ? (
-                                          <div className="error-text" style={{ paddingTop: '1.75rem' }}>
-                                            <AlertCircle size={15} />
-                                            <span>{lookup.error}</span>
+                                          <div style={{ paddingTop: '1.25rem' }}>
+                                            <div
+                                              style={{
+                                                display: 'flex',
+                                                alignItems: 'flex-start',
+                                                gap: '0.4rem',
+                                                color: 'var(--accent-rose)',
+                                                fontSize: '0.84rem',
+                                                lineHeight: '1.35',
+                                                background: '#fdf2f2',
+                                                padding: '0.55rem 0.75rem',
+                                                borderRadius: 'var(--radius-sm)',
+                                                border: '1px solid #fecaca'
+                                              }}
+                                            >
+                                              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: '2px' }} />
+                                              <div>
+                                                <div>{lookup.error}</div>
+                                                {lookup.isServiceError && (
+                                                  <div style={{ marginTop: '0.4rem' }}>
+                                                    <button
+                                                      type="button"
+                                                      onClick={() => handleRetryLookup(idx)}
+                                                      className="btn btn-secondary btn-sm"
+                                                      style={{
+                                                        fontSize: '0.75rem',
+                                                        padding: '0.2rem 0.55rem',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.3rem',
+                                                        background: '#fff',
+                                                        borderColor: '#fca5a5',
+                                                        color: '#b91c1c'
+                                                      }}
+                                                    >
+                                                      <RotateCcw size={12} /> Retry Verification
+                                                    </button>
+                                                  </div>
+                                                )}
+                                              </div>
+                                            </div>
                                           </div>
                                         ) : (
                                           <div style={{ color: 'var(--text-muted)', fontSize: '0.82rem', paddingTop: '1.75rem' }}>

@@ -231,7 +231,7 @@ async function createSubmission(req, res, next) {
       parsedTeamMembers = [];
     }
 
-    // Separate captain from additional teammates and eliminate duplicate captain entries
+    // Separate captain from additional teammates and eliminate/reject duplicate entries
     const additionalMembers = [];
     const seenRegNumbers = new Set();
     const captainRegUpper = (registerNumber || '').toString().trim().toUpperCase();
@@ -239,27 +239,124 @@ async function createSubmission(req, res, next) {
       seenRegNumbers.add(captainRegUpper);
     }
 
-    for (const member of parsedTeamMembers) {
+    let captainEntryFound = false;
+
+    for (let mIdx = 0; mIdx < parsedTeamMembers.length; mIdx++) {
+      const member = parsedTeamMembers[mIdx];
       if (!member) continue;
 
       const memReg = (member.registerNumber || member.register_number || '').toString().trim().toUpperCase();
       const isCapt = Boolean(member.isCaptain || member.is_captain);
 
-      // Skip captain entry (captain is counted and inserted exactly once)
+      // Identify captain entry (first member or marked isCaptain or matching captain register number)
       if (isCapt || (memReg && memReg === captainRegUpper)) {
+        if (captainEntryFound && memReg && memReg === captainRegUpper) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Team captain (${captainRegUpper}) cannot be added as another member.`
+          });
+        }
+        captainEntryFound = true;
         continue;
       }
 
-      // Skip duplicate entries of the same teammate
-      if (memReg && seenRegNumbers.has(memReg)) {
-        continue;
-      }
+      const memberType = member.memberType || member.member_type || 'College';
 
-      if (memReg) {
+      if (memberType === 'External') {
+        // Verify hackathon allows external participants
+        if (!Boolean(hackathon.allow_external_participants)) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: 'External participants are not permitted for this hackathon.'
+          });
+        }
+
+        const extName = String(member.name || '').trim();
+        const extInst = String(member.institution || '').trim();
+
+        if (!extName) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Full name is required for external member #${mIdx + 1}.`
+          });
+        }
+
+        if (!extInst) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Institution is required for external member #${mIdx + 1}.`
+          });
+        }
+
+        additionalMembers.push({
+          registerNumber: (member.registerNumber || member.register_number || '').toString().trim(),
+          name: extName,
+          institution: extInst,
+          department: String(member.department || '').trim(),
+          year: String(member.year || '').trim(),
+          section: String(member.section || '').trim(),
+          email: String(member.email || '').trim(),
+          memberType: 'External',
+          isCaptain: false
+        });
+
+      } else {
+        // College Member Validation
+        if (!memReg) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Register number is required for college member #${mIdx + 1}.`
+          });
+        }
+
+        if (seenRegNumbers.has(memReg)) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Duplicate student register number (${memReg}) cannot be added multiple times.`
+          });
+        }
+
         seenRegNumbers.add(memReg);
-      }
 
-      additionalMembers.push(member);
+        // Server-side verification against authoritative approved student list
+        const lookup = await fetchStudentFromProvider(memReg);
+
+        if (lookup.serviceUnavailable) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(503).json({
+            success: false,
+            message: `Student verification service is temporarily unavailable while verifying member (${memReg}). Please try again.`
+          });
+        }
+
+        if (!lookup.found || !lookup.student) {
+          if (req.file?.path) safeDeleteLocalFile(req.file.path);
+          return res.status(400).json({
+            success: false,
+            message: `Team member register number (${memReg}) is not in the approved student list.`
+          });
+        }
+
+        // Use authoritative verified details
+        const verifiedStudent = lookup.student;
+        additionalMembers.push({
+          registerNumber: verifiedStudent.registerNumber || memReg,
+          name: verifiedStudent.name,
+          department: verifiedStudent.department || 'CSE',
+          year: verifiedStudent.year || 'II',
+          section: verifiedStudent.section || 'A',
+          institution: 'College',
+          email: verifiedStudent.email || '',
+          memberType: 'College',
+          isCaptain: false
+        });
+      }
     }
 
     // Total team size: captain (counted exactly once = 1) + all distinct non-captain teammates

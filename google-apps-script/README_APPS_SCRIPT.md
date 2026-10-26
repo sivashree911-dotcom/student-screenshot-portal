@@ -4,35 +4,34 @@ Follow these steps to link your college's approved student list Google Sheet wit
 
 ---
 
-## 1. Create the Google Sheet
+## 1. Google Sheet & Worksheet Structure
 
-1. Open [Google Sheets](https://sheets.new) and create a new spreadsheet named **"Approved Students - Screenshot Portal"**.
-2. Rename the first tab/sheet to **"Students"**.
-3. In Row 1, add these exact column headers:
+1. Open your approved students Google Sheet (e.g. named **"Approved Students - Screenshot Portal"** or **"Elite Students"**).
+2. The script looks for a tab named **"Elite Students"** (preferred) or **"Students"**.
+3. In Row 1, ensure the following column headers exist (header detection is case-insensitive and flexible):
 
-| A | B | C | D | E | F | G |
+| Register Number | Student Name | Email | Department | Year | Section | Status |
 |---|---|---|---|---|---|---|
-| **Register Number** | **Student Name** | **Email** | **Department** | **Year** | **Section** | **Status** |
+| `95072512207` | `THANGAM K K` | `thangam@college.edu` | `CSE` | `II` | `A` | `Active` |
 
-4. Populate student rows with the approved students (e.g., Register Number: `1300`, Student Name: `Aarav Sharma`, Department: `CSE`, Year: `2`, Section: `A`, Status: `Active`).
+4. Populate student rows with approved students. If a student is marked with status `Inactive` or `Blocked`, they will not be allowed to register.
 
 ---
 
-## 2. Install the Google Apps Script API
+## 2. Install / Update the Google Apps Script API
 
 1. In your Google Sheet, click on **Extensions** > **Apps Script** from the top menu.
-2. Delete any existing code in the editor.
-3. Open [`Code.gs`](./Code.gs) in this directory, copy its entire contents, and paste into the Apps Script editor.
-4. Click the **Save** icon (diskette) or press `Ctrl + S`.
+2. Replace any existing code in `Code.gs` with the updated contents of [`Code.gs`](./Code.gs).
+3. Click the **Save** icon (diskette) or press `Ctrl + S`.
 
 ---
 
 ## 3. Deploy as a Web App
 
-1. In the top right of the Apps Script window, click **Deploy** > **New deployment**.
-2. Click the gear icon next to "Select type" and choose **Web app**.
+1. In the top right of the Apps Script window, click **Deploy** > **New deployment** (or **Manage deployments** > **Edit** > **New version**).
+2. Select type: **Web app**.
 3. Fill in the deployment configuration:
-   - **Description**: `Student Screenshot Portal Verification API`
+   - **Description**: `Student Screenshot Portal Verification API - Elite Students Update`
    - **Execute as**: `Me (your_email@gmail.com)`
    - **Who has access**: `Anyone` *(Crucial: allows the backend server to communicate with the API)*
 4. Click **Deploy**.
@@ -43,7 +42,7 @@ Follow these steps to link your college's approved student list Google Sheet wit
 
 ## 4. Configure Backend Environment
 
-Paste the copied URL into your `backend/.env` file:
+Ensure the URL is set in your `backend/.env` file:
 
 ```env
 APPS_SCRIPT_API_URL=https://script.google.com/macros/s/AKfycb.../exec
@@ -58,23 +57,31 @@ npm run dev
 
 ## 5. Verification Endpoint Testing
 
-Test in your browser or with curl:
+Test with curl or in your browser:
 
 ```bash
-curl "https://script.google.com/macros/s/AKfycb.../exec?operation=verifyStudent&registerNumber=1300"
+# 1. Verify single student:
+curl "https://script.google.com/macros/s/AKfycb.../exec?operation=verifyStudent&registerNumber=95072512207"
+
+# 2. Fetch all approved students:
+curl "https://script.google.com/macros/s/AKfycb.../exec?operation=getAllStudents"
+
+# 3. Health check:
+curl "https://script.google.com/macros/s/AKfycb.../exec?operation=healthCheck"
 ```
 
-Response format:
+Expected single verification response:
 ```json
 {
   "success": true,
   "found": true,
+  "message": "Student verified successfully.",
   "student": {
-    "registerNumber": "1300",
-    "name": "Aarav Sharma",
-    "email": "aarav.sharma@college.edu",
+    "registerNumber": "95072512207",
+    "name": "THANGAM K K",
+    "email": "thangam@college.edu",
     "department": "CSE",
-    "year": "2",
+    "year": "II",
     "section": "A",
     "status": "Active"
   }

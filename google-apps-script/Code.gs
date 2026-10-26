@@ -3,61 +3,62 @@
  * STUDENT SCREENSHOT PORTAL - GOOGLE APPS SCRIPT API
  * ==============================================================================
  * 
- * Instructions:
- * 1. Create a Google Sheet with a sheet tab named "Students" (or first tab).
- * 2. Set the following column headers in Row 1:
- *    - Register Number
- *    - Student Name
- *    - Email
- *    - Department
- *    - Year
- *    - Section
- *    - Status
- * 3. Go to Extensions > Apps Script in Google Sheets.
- * 4. Paste this code into Code.gs.
- * 5. Click "Deploy" > "New deployment".
- * 6. Select type: "Web app".
- * 7. Execute as: "Me", Who has access: "Anyone".
- * 8. Copy the Web App URL and paste it into your backend .env file:
- *    APPS_SCRIPT_API_URL=https://script.google.com/macros/s/AKfycb.../exec
+ * Target Worksheet: "Elite Students" (with fallback to "Students" / first sheet)
+ * Supported Operations:
+ *   - verifyStudent (param: registerNumber or regNo)
+ *   - getAllStudents
+ *   - healthCheck
+ * 
  * ==============================================================================
  */
 
 function doGet(e) {
   try {
-    const params = e ? e.parameter : {};
-    const operation = (params.operation || 'verifyStudent').trim();
+    const params = e && e.parameter ? e.parameter : {};
+    let operation = (params.operation || '').trim();
+
+    // Default operation detection if not explicitly specified
+    if (!operation) {
+      if (params.registerNumber || params.regNo) {
+        operation = 'verifyStudent';
+      } else {
+        operation = 'getAllStudents';
+      }
+    }
 
     if (operation === 'healthCheck') {
       return jsonResponse({
         success: true,
         status: 'UP',
+        service: 'Elite Students Verification Service',
         timestamp: new Date().toISOString()
       });
     }
 
     if (operation === 'verifyStudent') {
       const rawRegNo = params.registerNumber || params.regNo || '';
-      const registerNumber = String(rawRegNo).trim();
+      const normalizedSearch = normalizeRegNo(rawRegNo);
 
-      if (!registerNumber) {
+      if (!normalizedSearch) {
         return jsonResponse({
           success: false,
-          error: 'Register number parameter is required.'
+          error: 'Register number parameter is required and cannot be empty.'
         });
       }
 
-      const student = findStudentByRegisterNumber(registerNumber);
+      const student = findStudentByRegisterNumber(normalizedSearch);
       if (student) {
         return jsonResponse({
           success: true,
           found: true,
+          message: 'Student verified successfully.',
           student: student
         });
       } else {
         return jsonResponse({
           success: true,
-          found: false
+          found: false,
+          message: 'Register Number not found.'
         });
       }
     }
@@ -66,6 +67,8 @@ function doGet(e) {
       const students = fetchAllApprovedStudents();
       return jsonResponse({
         success: true,
+        status: 'ok',
+        service: 'Elite Students Verification Service',
         count: students.length,
         students: students
       });
@@ -85,44 +88,151 @@ function doGet(e) {
 }
 
 /**
- * Searches the spreadsheet row-by-row for the specified register number.
+ * Helper to safely resolve the authoritative worksheet.
+ * Prioritizes 'Elite Students', then 'Students', then case-insensitive matching.
  */
-function findStudentByRegisterNumber(searchRegNo) {
+function getTargetSheet() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Students') || ss.getSheets()[0];
+  if (!ss) {
+    throw new Error('Unable to access active spreadsheet.');
+  }
+
+  // 1. Direct name match: 'Elite Students'
+  let sheet = ss.getSheetByName('Elite Students');
+  if (sheet) return sheet;
+
+  // 2. Direct name match: 'Students' or 'Approved Students'
+  sheet = ss.getSheetByName('Students') || ss.getSheetByName('Approved Students');
+  if (sheet) return sheet;
+
+  // 3. Case-insensitive search
+  const sheets = ss.getSheets();
+  for (let s of sheets) {
+    const sName = s.getName().trim().toLowerCase();
+    if (sName.includes('elite') || sName.includes('student') || sName.includes('approved')) {
+      return s;
+    }
+  }
+
+  // 4. Default to first sheet
+  return sheets.length > 0 ? sheets[0] : null;
+}
+
+/**
+ * Maps column indices dynamically from row 1 header values.
+ */
+function getColumnMapping(headerRow) {
+  const headers = headerRow.map(h => String(h || '').trim().toLowerCase());
+
+  const findIdx = (patterns) => {
+    return headers.findIndex(h => patterns.some(p => p.test(h)));
+  };
+
+  const regNoIdx = findIdx([
+    /^register\s*(number|no\.?)$/i,
+    /register/i,
+    /^reg\.?\s*(no\.?|number)?$/i,
+    /roll\s*(no\.?|number)?/i,
+    /htno/i,
+    /^id$/i
+  ]);
+
+  const nameIdx = findIdx([
+    /^student\s*name$/i,
+    /^full\s*name$/i,
+    /^name$/i,
+    /student/i
+  ]);
+
+  const emailIdx = findIdx([
+    /^e-?mail\s*(id|address)?$/i,
+    /mail/i
+  ]);
+
+  const deptIdx = findIdx([
+    /^department$/i,
+    /^dept\.?$/i,
+    /^branch$/i,
+    /^course$/i
+  ]);
+
+  const yearIdx = findIdx([
+    /^year$/i,
+    /^yr\.?$/i,
+    /^class$/i
+  ]);
+
+  const secIdx = findIdx([
+    /^section$/i,
+    /^sec\.?$/i
+  ]);
+
+  const statusIdx = findIdx([
+    /^status$/i,
+    /^state$/i,
+    /^approval$/i
+  ]);
+
+  return { regNoIdx, nameIdx, emailIdx, deptIdx, yearIdx, secIdx, statusIdx };
+}
+
+/**
+ * Searches the spreadsheet row-by-row for the specified normalized register number.
+ */
+function findStudentByRegisterNumber(normalizedSearch) {
+  const sheet = getTargetSheet();
+  if (!sheet) return null;
+
   const data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) return null;
 
-  if (data.length < 2) return null;
-
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
-  const regNoIdx = headers.findIndex(h => h.includes('register') || h.includes('reg') || h.includes('roll'));
-  const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('student'));
-  const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
-  const deptIdx = headers.findIndex(h => h.includes('department') || h.includes('dept') || h.includes('branch'));
-  const yearIdx = headers.findIndex(h => h.includes('year'));
-  const secIdx = headers.findIndex(h => h.includes('section') || h.includes('sec'));
-  const statusIdx = headers.findIndex(h => h.includes('status'));
-
-  const normalizedSearch = normalizeRegNo(searchRegNo);
+  const mapping = getColumnMapping(data[0]);
+  if (mapping.regNoIdx < 0) {
+    // If no register number header was detected, fallback to column 0
+    mapping.regNoIdx = 0;
+  }
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const rowRegNo = regNoIdx >= 0 ? normalizeRegNo(row[regNoIdx]) : '';
+    const cellValue = row[mapping.regNoIdx];
+    if (cellValue === undefined || cellValue === null || String(cellValue).trim() === '') {
+      continue;
+    }
 
-    if (rowRegNo && rowRegNo === normalizedSearch) {
-      const statusVal = statusIdx >= 0 && row[statusIdx] ? String(row[statusIdx]).trim().toLowerCase() : 'active';
-      if (statusVal === 'inactive' || statusVal === 'blocked') {
-        return null;
+    const rowRegNoNormalized = normalizeRegNo(cellValue);
+
+    if (rowRegNoNormalized === normalizedSearch) {
+      // Check status if status column exists
+      let statusVal = 'Active';
+      if (mapping.statusIdx >= 0 && row[mapping.statusIdx]) {
+        statusVal = String(row[mapping.statusIdx]).trim();
       }
 
+      const statusLower = statusVal.toLowerCase();
+      if (
+        statusLower === 'inactive' ||
+        statusLower === 'blocked' ||
+        statusLower === 'rejected' ||
+        statusLower === 'unapproved' ||
+        statusLower === 'disabled'
+      ) {
+        return null; // Explicitly inactive / unapproved
+      }
+
+      const rawName = mapping.nameIdx >= 0 && row[mapping.nameIdx] ? String(row[mapping.nameIdx]).trim() : '';
+      const rawDept = mapping.deptIdx >= 0 && row[mapping.deptIdx] ? String(row[mapping.deptIdx]).trim() : '';
+      const rawYear = mapping.yearIdx >= 0 && row[mapping.yearIdx] ? String(row[mapping.yearIdx]).trim() : '';
+      const rawSec = mapping.secIdx >= 0 && row[mapping.secIdx] ? String(row[mapping.secIdx]).trim() : '';
+      const rawEmail = mapping.emailIdx >= 0 && row[mapping.emailIdx] ? String(row[mapping.emailIdx]).trim() : '';
+
       return {
-        registerNumber: String(row[regNoIdx]).trim(),
-        name: nameIdx >= 0 ? String(row[nameIdx]).trim() : 'College Student',
-        email: emailIdx >= 0 ? String(row[emailIdx]).trim() : '',
-        department: deptIdx >= 0 ? String(row[deptIdx]).trim() : 'CSE',
-        year: yearIdx >= 0 ? String(row[yearIdx]).trim() : '2',
-        section: secIdx >= 0 ? String(row[secIdx]).trim() : 'A',
-        status: 'Active'
+        registerNumber: String(cellValue).trim(),
+        name: rawName || 'College Student',
+        email: rawEmail || '',
+        department: rawDept || 'CSE',
+        year: rawYear || 'II',
+        section: rawSec || 'A',
+        status: statusVal || 'Active'
       };
     }
   }
@@ -134,46 +244,81 @@ function findStudentByRegisterNumber(searchRegNo) {
  * Fetches all approved active students from the spreadsheet.
  */
 function fetchAllApprovedStudents() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Students') || ss.getSheets()[0];
+  const sheet = getTargetSheet();
+  if (!sheet) return [];
+
   const data = sheet.getDataRange().getValues();
+  if (!data || data.length < 2) return [];
 
-  if (data.length < 2) return [];
-
-  const headers = data[0].map(h => String(h).trim().toLowerCase());
-  const regNoIdx = headers.findIndex(h => h.includes('register') || h.includes('reg') || h.includes('roll'));
-  const nameIdx = headers.findIndex(h => h.includes('name') || h.includes('student'));
-  const emailIdx = headers.findIndex(h => h.includes('email') || h.includes('mail'));
-  const deptIdx = headers.findIndex(h => h.includes('department') || h.includes('dept') || h.includes('branch'));
-  const yearIdx = headers.findIndex(h => h.includes('year'));
-  const secIdx = headers.findIndex(h => h.includes('section') || h.includes('sec'));
-  const statusIdx = headers.findIndex(h => h.includes('status'));
+  const mapping = getColumnMapping(data[0]);
+  if (mapping.regNoIdx < 0) {
+    mapping.regNoIdx = 0;
+  }
 
   const students = [];
+  const seenRegNos = {};
 
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
-    const rowRegNo = regNoIdx >= 0 ? String(row[regNoIdx]).trim() : '';
-    if (!rowRegNo) continue;
+    const cellValue = row[mapping.regNoIdx];
+    if (cellValue === undefined || cellValue === null || String(cellValue).trim() === '') {
+      continue;
+    }
 
-    const statusVal = statusIdx >= 0 && row[statusIdx] ? String(row[statusIdx]).trim() : 'Active';
+    const rowRegNo = String(cellValue).trim();
+    const normalizedReg = normalizeRegNo(rowRegNo);
+    if (!normalizedReg) continue;
+
+    // Skip duplicates
+    if (seenRegNos[normalizedReg]) {
+      continue;
+    }
+    seenRegNos[normalizedReg] = true;
+
+    // Check status
+    let statusVal = 'Active';
+    if (mapping.statusIdx >= 0 && row[mapping.statusIdx]) {
+      statusVal = String(row[mapping.statusIdx]).trim();
+    }
+
+    const statusLower = statusVal.toLowerCase();
+    if (
+      statusLower === 'inactive' ||
+      statusLower === 'blocked' ||
+      statusLower === 'rejected' ||
+      statusLower === 'unapproved' ||
+      statusLower === 'disabled'
+    ) {
+      continue;
+    }
+
+    const rawName = mapping.nameIdx >= 0 && row[mapping.nameIdx] ? String(row[mapping.nameIdx]).trim() : '';
+    const rawDept = mapping.deptIdx >= 0 && row[mapping.deptIdx] ? String(row[mapping.deptIdx]).trim() : '';
+    const rawYear = mapping.yearIdx >= 0 && row[mapping.yearIdx] ? String(row[mapping.yearIdx]).trim() : '';
+    const rawSec = mapping.secIdx >= 0 && row[mapping.secIdx] ? String(row[mapping.secIdx]).trim() : '';
+    const rawEmail = mapping.emailIdx >= 0 && row[mapping.emailIdx] ? String(row[mapping.emailIdx]).trim() : '';
 
     students.push({
       registerNumber: rowRegNo,
-      name: nameIdx >= 0 ? String(row[nameIdx]).trim() : 'Student',
-      email: emailIdx >= 0 ? String(row[emailIdx]).trim() : '',
-      department: deptIdx >= 0 ? String(row[deptIdx]).trim() : 'CSE',
-      year: yearIdx >= 0 ? String(row[yearIdx]).trim() : '2',
-      section: secIdx >= 0 ? String(row[secIdx]).trim() : 'A',
-      status: statusVal
+      name: rawName || 'Student',
+      email: rawEmail || '',
+      department: rawDept || 'CSE',
+      year: rawYear || 'II',
+      section: rawSec || 'A',
+      status: statusVal || 'Active'
     });
   }
 
   return students;
 }
 
+/**
+ * Strict register-number normalization consistent across frontend, backend, and Apps Script.
+ * Preserves leading digits and alphanumeric characters without precision loss.
+ */
 function normalizeRegNo(val) {
-  return String(val || '')
+  if (val === null || val === undefined) return '';
+  return String(val)
     .trim()
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, '');
