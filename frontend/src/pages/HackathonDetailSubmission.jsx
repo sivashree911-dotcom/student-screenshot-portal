@@ -28,12 +28,18 @@ import {
 
 export default function HackathonDetailSubmission() {
   const { id } = useParams();
-  const { student } = useStudentAuth();
+  const { student, loginStudent } = useStudentAuth();
   const navigate = useNavigate();
 
   const [hackathon, setHackathon] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Captain session expiration & re-verification state
+  const [captainSessionExpired, setCaptainSessionExpired] = useState(false);
+  const [captainSessionMessage, setCaptainSessionMessage] = useState(null);
+  const [captainReverifying, setCaptainReverifying] = useState(false);
+  const [captainReverifyError, setCaptainReverifyError] = useState(null);
 
   // Existing Student Submission (for resubmission or status lock)
   const [existingSubmission, setExistingSubmission] = useState(null);
@@ -249,13 +255,33 @@ export default function HackathonDetailSubmission() {
     } catch (err) {
       if (lookupRequestIds.current[index] !== reqId) return;
 
+      // Check if this error is due to the Captain's authenticated session expiring
+      if (err.isAuthError || err.status === 401 || err.status === 403 || err.isExpired) {
+        // Clear the member loading and error state so Member 2 is NOT falsely blamed for session expiration
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: null,
+            isServiceError: false,
+            requestId: reqId
+          }
+        }));
+        setCaptainSessionExpired(true);
+        setCaptainSessionMessage(
+          err.message || 'Team Captain session has expired. Please re-verify your register number to continue.'
+        );
+        return;
+      }
+
       if (err.isNetworkError || err.status === 503) {
         setMemberLookups((prev) => ({
           ...prev,
           [index]: {
             loading: false,
             data: null,
-            error: 'Unable to verify right now. Please try again.',
+            error: 'Student verification service is temporarily unavailable. Please try again.',
             isServiceError: true,
             requestId: reqId
           }
@@ -267,6 +293,17 @@ export default function HackathonDetailSubmission() {
             loading: false,
             data: null,
             error: 'This register number was not found in the approved student list. Please check the entered number.',
+            isServiceError: false,
+            requestId: reqId
+          }
+        }));
+      } else if (err.status === 400) {
+        setMemberLookups((prev) => ({
+          ...prev,
+          [index]: {
+            loading: false,
+            data: null,
+            error: err.message || 'Please provide a valid register number.',
             isServiceError: false,
             requestId: reqId
           }
@@ -404,6 +441,41 @@ export default function HackathonDetailSubmission() {
     performMemberLookup(index, trimmed, currentReqId);
   };
 
+  // Re-verify captain session inline without losing form state
+  const handleReverifyCaptain = async () => {
+    const captainReg = (student?.registerNumber || members[0]?.registerNumber || '').trim();
+    if (!captainReg) {
+      setCaptainReverifyError('No captain register number found. Please log in again.');
+      return;
+    }
+
+    setCaptainReverifying(true);
+    setCaptainReverifyError(null);
+
+    try {
+      const res = await api.post('/students/verify', { registerNumber: captainReg });
+      if (res.success && res.student && res.token) {
+        loginStudent(res.student, res.token);
+        setCaptainSessionExpired(false);
+        setCaptainSessionMessage(null);
+        setError(null);
+
+        // Automatically retry verification for any college teammate with an entered register number
+        members.forEach((m, idx) => {
+          if (idx > 0 && m.memberType === 'College' && m.registerNumber && m.registerNumber.trim()) {
+            handleRetryLookup(idx);
+          }
+        });
+      } else {
+        setCaptainReverifyError(res.message || 'Could not re-verify register number.');
+      }
+    } catch (err) {
+      setCaptainReverifyError(err.message || 'Verification service failed. Please check your connection.');
+    } finally {
+      setCaptainReverifying(false);
+    }
+  };
+
   // Toggle member type between College and External
   const handleToggleMemberType = (index, type) => {
     if (lookupDebounceTimers.current[index]) {
@@ -523,7 +595,13 @@ export default function HackathonDetailSubmission() {
         } catch (e) {}
       }
     } catch (err) {
-      setError(err.message || 'Failed to submit registration proof. Please try again.');
+      if (err.isAuthError || err.status === 401 || err.status === 403 || err.isExpired) {
+        setCaptainSessionExpired(true);
+        setCaptainSessionMessage(err.message || 'Team Captain session has expired. Please re-verify your register number.');
+        setError('Captain session has expired. Please re-verify your register number above to complete registration.');
+      } else {
+        setError(err.message || 'Failed to submit registration proof. Please try again.');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -996,6 +1074,73 @@ export default function HackathonDetailSubmission() {
                           </div>
                         </div>
 
+                        {/* Captain Session Expired Banner */}
+                        {captainSessionExpired && (
+                          <div
+                            style={{
+                              background: '#FFFBEB',
+                              border: '1.5px solid #F59E0B',
+                              borderRadius: 'var(--radius-lg)',
+                              padding: '1.25rem 1.5rem',
+                              marginBottom: '1.5rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              flexWrap: 'wrap',
+                              gap: '1rem',
+                              boxShadow: '0 2px 8px rgba(245, 158, 11, 0.15)'
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem', maxWidth: '600px' }}>
+                              <AlertCircle size={22} style={{ color: '#D97706', flexShrink: 0, marginTop: '2px' }} />
+                              <div>
+                                <div style={{ fontWeight: 800, color: '#92400E', fontSize: '0.98rem' }}>
+                                  Team Captain Session Expired
+                                </div>
+                                <div style={{ color: '#B45309', fontSize: '0.88rem', marginTop: '0.2rem', lineHeight: '1.4' }}>
+                                  {captainSessionMessage || 'Your session as Team Captain has expired. Re-verify your register number to continue verifying teammates and submit your registration.'}
+                                </div>
+                                {captainReverifyError && (
+                                  <div style={{ color: 'var(--accent-rose)', fontSize: '0.84rem', marginTop: '0.4rem', fontWeight: 600 }}>
+                                    {captainReverifyError}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={handleReverifyCaptain}
+                                disabled={captainReverifying}
+                                className="btn btn-primary"
+                                style={{
+                                  background: '#D97706',
+                                  borderColor: '#B45309',
+                                  color: '#fff',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '0.5rem',
+                                  padding: '0.55rem 1.1rem',
+                                  fontWeight: 700
+                                }}
+                              >
+                                {captainReverifying ? (
+                                  <>
+                                    <Loader2 size={16} className="animate-spin" />
+                                    <span>Re-verifying Session...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <RotateCcw size={16} />
+                                    <span>Re-verify Captain Session</span>
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
                         {/* Member List */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                           {members.map((member, idx) => {
@@ -1063,21 +1208,31 @@ export default function HackathonDetailSubmission() {
                                   >
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>REGISTER NUMBER</span>
-                                      <span className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>{student.registerNumber}</span>
+                                      <span className="font-mono" style={{ fontWeight: 700, color: 'var(--brand-navy)' }}>
+                                        {student?.registerNumber || member.registerNumber}
+                                      </span>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STUDENT NAME</span>
-                                      <strong style={{ color: 'var(--brand-navy)' }}>{student.name}</strong>
+                                      <strong style={{ color: 'var(--brand-navy)' }}>{student?.name || member.name}</strong>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>DEPARTMENT / YEAR</span>
-                                      <span style={{ color: 'var(--text-secondary)' }}>{student.department} (Year {student.year})</span>
+                                      <span style={{ color: 'var(--text-secondary)' }}>
+                                        {(student?.department || member.department)} {student?.year || member.year ? `(Year ${student?.year || member.year})` : ''}
+                                      </span>
                                     </div>
                                     <div>
                                       <span className="text-muted" style={{ fontSize: '0.75rem', display: 'block' }}>STATUS</span>
-                                      <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
-                                        <CheckCircle2 size={14} /> Verified Captain
-                                      </span>
+                                      {captainSessionExpired ? (
+                                        <span style={{ color: '#D97706', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          <AlertCircle size={14} /> Session Expired
+                                        </span>
+                                      ) : (
+                                        <span style={{ color: 'var(--accent-emerald)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                                          <CheckCircle2 size={14} /> Verified Captain
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 ) : member.memberType === 'College' ? (
@@ -1243,7 +1398,9 @@ export default function HackathonDetailSubmission() {
                           </div>
                           <div>
                             <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>SUBMITTING CAPTAIN</span>
-                            <strong style={{ color: 'var(--brand-navy)' }}>{student.name} ({student.registerNumber})</strong>
+                            <strong style={{ color: 'var(--brand-navy)' }}>
+                              {student?.name || members[0]?.name || 'Captain'} ({student?.registerNumber || members[0]?.registerNumber || ''})
+                            </strong>
                           </div>
                           <div>
                             <span className="text-muted" style={{ fontSize: '0.78rem', display: 'block', fontWeight: 600 }}>TOTAL TEAM SIZE</span>

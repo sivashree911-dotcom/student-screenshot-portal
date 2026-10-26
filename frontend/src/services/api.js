@@ -109,9 +109,12 @@ async function request(endpoint, options = {}) {
     ...options.headers
   };
 
-  // Attach student or admin token if present
-  const adminToken = localStorage.getItem('admin_token');
-  const studentToken = localStorage.getItem('student_token');
+  // Attach student or admin token if present and valid
+  const rawAdminToken = localStorage.getItem('admin_token');
+  const rawStudentToken = localStorage.getItem('student_token');
+
+  const adminToken = rawAdminToken && rawAdminToken !== 'null' && rawAdminToken !== 'undefined' ? rawAdminToken.trim() : null;
+  const studentToken = rawStudentToken && rawStudentToken !== 'null' && rawStudentToken !== 'undefined' ? rawStudentToken.trim() : null;
 
   // If endpoint is admin-specific, prioritize admin token
   if (
@@ -175,9 +178,11 @@ async function request(endpoint, options = {}) {
     let errorMsg = data && data.message;
     if (!errorMsg) {
       if (response.status === 503) {
-        errorMsg = 'Database service is temporarily unavailable. Please verify database connection.';
+        errorMsg = 'Service is temporarily unavailable. Please try again.';
       } else if (response.status === 401) {
-        errorMsg = 'Invalid credentials or unauthorized access.';
+        errorMsg = 'Session has expired or authentication is required.';
+      } else if (response.status === 403) {
+        errorMsg = 'Access denied. You do not have permission to perform this action.';
       } else if (response.status === 404) {
         errorMsg = 'Requested resource not found.';
       } else {
@@ -188,6 +193,12 @@ async function request(endpoint, options = {}) {
     const error = new Error(errorMsg);
     error.status = response.status;
     error.data = data;
+    error.isAuthError = response.status === 401 || response.status === 403;
+    error.isExpired = Boolean(
+      data?.isExpired ||
+      data?.errorCategory === 'SESSION_EXPIRED' ||
+      (errorMsg && errorMsg.toLowerCase().includes('expired'))
+    );
     error.isNetworkError = false;
     throw error;
   }
